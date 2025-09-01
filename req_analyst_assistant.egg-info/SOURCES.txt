@@ -1,0 +1,16 @@
+pyproject.toml
+setup.py
+analysis/__init__.py
+analysis/index.py
+analysis/qa.py
+ingestion/__init__.py
+ingestion/loader.py
+req_analyst_assistant.egg-info/PKG-INFO
+req_analyst_assistant.egg-info/SOURCES.txt
+req_analyst_assistant.egg-info/dependency_links.txt
+req_analyst_assistant.egg-info/requires.txt
+req_analyst_assistant.egg-info/top_level.txt
+tests/test_index.py
+tests/test_ingestion.py
+ui/__init__.py
+ui/app.py

@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: req-analyst-assistant
+Version: 0.1.0
+Summary: Requirements analyst assistant MVP: Streamlit UI + LangChain + Unstructured + OpenAI/HF
+Requires-Python: >=3.10
+Requires-Dist: streamlit>=1.37
+Requires-Dist: langchain>=0.2
+Requires-Dist: langchain-community>=0.2
+Requires-Dist: langchain-openai>=0.1.22
+Requires-Dist: unstructured>=0.14.0
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: faiss-cpu>=1.8.0.post1
+Requires-Dist: tiktoken>=0.7.0
+Requires-Dist: openai>=1.40.0
+Requires-Dist: sentence-transformers>=3.0.1
+Requires-Dist: pandas>=2.2.2
+Requires-Dist: pytest>=8.2.0
+Requires-Dist: pytest-cov>=5.0.0
+Requires-Dist: ruff>=0.5.5

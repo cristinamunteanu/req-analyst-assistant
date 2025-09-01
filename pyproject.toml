@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "req-analyst-assistant"
+version = "0.1.0"
+description = "Requirements analyst assistant MVP: Streamlit UI + LangChain + Unstructured + OpenAI/HF"
+requires-python = ">=3.10"
+dependencies = [
+  "streamlit>=1.37",
+  "langchain>=0.2",
+  "langchain-community>=0.2",
+  "langchain-openai>=0.1.22",
+  "unstructured>=0.14.0",
+  "pydantic>=2.8.0",
+  "python-dotenv>=1.0.1",
+  "faiss-cpu>=1.8.0.post1",
+  "tiktoken>=0.7.0",
+  "openai>=1.40.0",
+  "sentence-transformers>=3.0.1",
+  "pandas>=2.2.2",
+  "pytest>=8.2.0",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.5.5"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ingestion*", "analysis*", "ui*"]
+exclude = ["tests*", "data*", ".*"]
+
+[tool.ruff]
+line-length = 100
+select = ["E","F","I","B","UP"]
