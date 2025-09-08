@@ -5,6 +5,7 @@ from unstructured.partition.auto import partition
 def load_documents(input_dir: str = "data") -> List[Dict[str, Any]]:
     """
     Parses all files under the specified input directory into plain text with simple metadata.
+    Skips hidden and temporary files.
 
     For each file found recursively in the input directory, attempts to extract text content
     using the `partition` function from the unstructured library. If text is successfully
@@ -24,7 +25,14 @@ def load_documents(input_dir: str = "data") -> List[Dict[str, Any]]:
     """
     docs: List[Dict[str, Any]] = []
     for path in Path(input_dir).glob("**/*"):
-        if not path.is_file():
+        name = path.name
+        if (
+            not path.is_file()
+            or name.startswith(".")
+            or name.startswith("~")
+            or name.endswith("#")
+            or name.startswith("~$")
+        ):
             continue
         try:
             elements = partition(filename=str(path))

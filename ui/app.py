@@ -4,9 +4,11 @@ from dotenv import load_dotenv
 from ingestion.loader import load_documents
 from analysis.index import build_index
 from analysis.qa import make_qa
-from analysis.summarize_requirements import summarize_requirements
+from analysis.normalize_requirements import normalize_requirements
+from analysis.utils import split_into_requirements, is_requirement, parse_llm_content
 import importlib
 import io
+import json
 
 st.set_page_config(page_title="RAG MVP", page_icon="🔎", layout="wide")
 load_dotenv()
@@ -111,31 +113,41 @@ with tab_search:
             st.text(tb)
 
 with tab_summaries:
-    st.subheader("Requirement Summaries")
+    st.subheader("Requirement Normalization & Categorization")
     try:
         docs = load_documents("data")
-        summaries = summarize_requirements(docs)
-        if summaries:
+        requirement_chunks = []
+        for doc in docs:
+            requirements = split_into_requirements(doc["text"])
+            for req in requirements[1:]:  # skip preamble
+                if is_requirement(req):
+                    requirement_chunks.append({
+                        "text": req,
+                        "source": doc.get("source") or doc.get("path", "unknown")
+                    })
+
+        
+        results = normalize_requirements(requirement_chunks)
+        if results:
             import pandas as pd
-            def get_summary_text(s):
-                # Handles both AIMessage and str
-                if hasattr(s["summary"], "content"):
-                    return s["summary"].content
-                return str(s["summary"])
             df = pd.DataFrame([
                 {
-                    "Source": s["source"],
-                    "Snippet": s["text"][:120] + ("..." if len(s["text"]) > 120 else ""),
-                    "Summary": get_summary_text(s),
-                    "Open": f"[Open]({s['source']})" if s["source"].startswith("http") else s["source"]
+                    "Source": r["source"],
+                    "Requirement": r["text"],
+                    "Normalized": r["normalized"],
+                    "Categories": ", ".join(r["categories"]),
                 }
-                for s in summaries
+                for r in results
             ])
             st.dataframe(df, use_container_width=True)
+            for r in results:
+                print("NORMALIZED FIELD:", repr(r["normalized"]))
+                break
         else:
-            st.info("No summaries available.")
+            st.info("No requirements processed.")
     except Exception as e:
-        st.error(f"Failed to generate summaries: {e}")
+        st.error(f"Failed to process requirements: {e}")
+
 
 with tab_quality:
     st.info("Quality metrics and analysis coming soon.")
