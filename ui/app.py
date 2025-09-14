@@ -14,6 +14,7 @@ from analysis.normalize_requirements import normalize_requirements
 from analysis.utils import split_into_requirements, is_requirement, parse_llm_content
 from analysis.heuristics import analyze_clarity
 from analysis.rewrites import suggest_rewrites
+from analysis.testgen import generate_test_ideas
 
 st.set_page_config(page_title="RAG MVP", page_icon="🔎", layout="wide")
 load_dotenv()
@@ -83,7 +84,7 @@ with st.sidebar:
     )
 
 # --- Tabbed layout ---
-tab_search, tab_summaries, tab_quality = st.tabs(["Search", "Summaries", "Quality"])
+tab_search, tab_summaries, tab_quality, tab_tests = st.tabs(["Search", "Summaries", "Quality", "Test ideas"])
 
 with tab_search:
     col1, col2 = st.columns([3, 1])
@@ -272,6 +273,56 @@ with tab_quality:
 
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
+
+with tab_tests:
+    st.subheader("💡 Test Ideas for Requirements")
+    try:
+        docs = load_documents("data")
+        requirement_rows = []
+        for doc in docs:
+            for req in split_into_requirements(doc["text"]):
+                if is_requirement(req):
+                    requirement_rows.append({
+                        "Source": doc.get("source") or doc.get("path", "unknown"),
+                        "Requirement": req,
+                    })
+
+        if not requirement_rows:
+            st.info("No requirements detected.")
+            st.stop()
+
+        for r in requirement_rows:
+            with st.expander(f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}"):
+                # Determine status based on issues
+                status = "ready"
+                issues = {i["type"] for i in r.get("Issues", [])}
+                if "TBD" in issues:
+                    status = "blocked"
+                elif {"Ambiguous", "NonVerifiable", "PassiveVoice"} & issues:
+                    status = "provisional"
+
+                badge = {"ready": "✅ Ready", "provisional": "🟡 Provisional", "blocked": "🚩 Blocked"}[status]
+                st.markdown(f"**Status:** {badge}")
+
+                ideas = generate_test_ideas(r["Requirement"])
+                st.caption(f"Requirement type: **{ideas['type']}**")
+
+                if status == "blocked":
+                    st.warning("REQUIRES SPECIFICATION — replace TBD/XXX before finalizing.")
+                elif status == "provisional":
+                    st.info("Provisional — refine vague terms or add measurable thresholds.")
+
+                for idea in ideas["ideas"]:
+                    st.markdown(f"**{idea['title']}**")
+                    st.markdown("- **Steps:**")
+                    for step in idea["steps"]:
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;- {step}", unsafe_allow_html=True)
+                    st.markdown("- **Acceptance:**")
+                    for acc in idea["acceptance"]:
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;- {acc}", unsafe_allow_html=True)
+                    st.markdown("---")
+    except Exception as e:
+        st.error(f"Failed to generate test ideas: {e}")
 
 
 
