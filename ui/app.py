@@ -16,6 +16,7 @@ from analysis.heuristics import analyze_clarity
 from analysis.rewrites import suggest_rewrites
 from analysis.testgen import generate_test_ideas
 
+
 st.set_page_config(page_title="RAG MVP", page_icon="🔎", layout="wide")
 load_dotenv()
 
@@ -66,6 +67,15 @@ st.caption("Streamlit UI • LangChain • Unstructured • OpenAI/HF")
 # At the very top of your Streamlit app (after st.title or st.caption), add an anchor:
 st.markdown('<div id="top"></div>', unsafe_allow_html=True)
 
+st.markdown("""
+    <style>
+    pre {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- Logs expander in sidebar ---
 with st.sidebar.expander("Logs", expanded=False):
     st.code(log_buffer.getvalue() or "No logs yet.", language="text")
@@ -86,7 +96,9 @@ with st.sidebar:
 # --- Tabbed layout ---
 tab_search, tab_summaries, tab_quality, tab_tests = st.tabs(["Search", "Summaries", "Quality", "Test ideas"])
 
+
 with tab_search:
+    st.markdown("## 🔍 Search")
     col1, col2 = st.columns([3, 1])
     with col2:
         llm_options = available_llm_providers()
@@ -121,12 +133,52 @@ with tab_search:
                 log(f"Calling QA chain with: {query}")
                 out = qa({"query": query})
                 log(f"QA chain output: {out}")
-            st.subheader("Answer")
-            st.write(out.get("result", "No answer returned."))
-            st.subheader("Sources")
-            sources = {d.metadata.get("source", "unknown") for d in out.get("source_documents", [])}
-            for src in sources:
-                st.write("•", src)
+
+            # Before your answer section, reset feedback if a new query is entered
+            if "last_query" not in st.session_state or st.session_state["last_query"] != query:
+                st.session_state["answer_feedback"] = None
+                st.session_state["last_query"] = query
+
+            with st.container():
+                st.markdown("### 🟩 Answer")
+                answer = out.get("result", "No answer returned.")
+
+                # Revert to plain markdown bullets for answer display
+                if isinstance(answer, list):
+                    for req in answer:
+                        desc = req.get("description", "")
+                        st.markdown(f"- {desc}")
+                else:
+                    st.markdown(answer)
+
+            with st.container():
+                st.markdown("### 📄 Sources")
+                sources = {d.metadata.get("source", "unknown") for d in out.get("source_documents", [])}
+                if len(sources) > 3:
+                    with st.expander("View Sources"):
+                        for src in sources:
+                            if (src.startswith("data/") and os.path.exists(src)):
+                                with open(src, "rb") as f:
+                                    st.download_button(
+                                        label=f"Download {os.path.basename(src)}",
+                                        data=f,
+                                        file_name=os.path.basename(src),
+                                        mime="application/octet-stream"
+                                    )
+                            else:
+                                st.write("•", src)
+                else:
+                    for src in sources:
+                        if (src.startswith("data/") and os.path.exists(src)):
+                            with open(src, "rb") as f:
+                                st.download_button(
+                                    label=f"Download {os.path.basename(src)}",
+                                    data=f,
+                                    file_name=os.path.basename(src),
+                                    mime="application/octet-stream"
+                                )
+                        else:
+                            st.write("•", src)
         except Exception as e:
             st.error(f"An error occurred while processing your question: {e}")
             import traceback
@@ -135,7 +187,7 @@ with tab_search:
             st.text(tb)
 
 with tab_summaries:
-    st.subheader("Requirement Normalization & Categorization")
+    st.markdown("## 📋 Requirement Normalization & Categorization")
     try:
         docs = load_documents("data")
         requirement_chunks = []
@@ -148,7 +200,6 @@ with tab_summaries:
                         "source": doc.get("source") or doc.get("path", "unknown")
                     })
 
-        
         results = normalize_requirements(requirement_chunks)
         if results:
             import pandas as pd
@@ -170,11 +221,8 @@ with tab_summaries:
     except Exception as e:
         st.error(f"Failed to process requirements: {e}")
 
-
 with tab_quality:
-    
-    st.subheader("Clarity & Ambiguity Checks")
-
+    st.markdown("## 🧹 Clarity & Ambiguity Checks")
     try:
         docs = load_documents("data")
         requirement_rows = []
@@ -193,8 +241,8 @@ with tab_quality:
             st.info("No requirements detected.")
             st.stop()
 
-        # --- Filters (chips) ---
-        st.caption("Filters")
+        st.divider()
+        st.caption("### Filters")
         colA, colB, colC, colD = st.columns(4)
         f_amb = colA.toggle("Ambiguous", value=True)
         f_pass = colB.toggle("Passive voice", value=True)
@@ -211,8 +259,8 @@ with tab_quality:
 
         filtered = [r for r in requirement_rows if pass_filters(r["Issues"])]
 
-        # --- Table view ---
-        # Add an anchor for each requirement's details section
+        st.divider()
+        st.markdown("### Table View")
         df = pd.DataFrame([
             {
                 "Clarity": r["ClarityScore"],
@@ -227,38 +275,30 @@ with tab_quality:
             for r in filtered
         ]).sort_values(by=["Clarity", "Issues"], ascending=[True, True])
 
-        # Use st.markdown to allow HTML links in the Details column
         st.write(
             df.to_html(escape=False, index=False),
             unsafe_allow_html=True,
         )
 
-        # --- Detail rows with rewrite action ---
-        st.subheader("Details & Suggested Rewrites")
-
-        # For each filtered requirement, show an expandable section with details and rewrite suggestion
+        st.divider()
+        st.markdown("### Details & Suggested Rewrites")
         for r in filtered:
-            # Add an anchor for linking from the table
             st.markdown(f'<div id="req-{abs(hash(r["Requirement"]))}"></div>', unsafe_allow_html=True)
             with st.expander(
                 f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}  •  Clarity {r['ClarityScore']}"
             ):
                 if r["ClarityScore"] == 100:
-                    # Show green badge and hide rewrite button
                     st.markdown(
                         '<span style="color: #28a745; font-weight: bold; font-size: 1.1em;">✅ No issues detected</span>',
                         unsafe_allow_html=True
                     )
                 else:
                     if r["Issues"]:
-                        # List each detected issue with its type, note, and the problematic text span
                         for i in r["Issues"]:
                             st.markdown(
                                 f"- **{i.type}** — {i.note}\n\n    ⟶ _“…{i.span}…”_"
                             )
-                    # Show the suggest rewrite button only if clarity < 100
                     if st.button("💡 Suggest rewrite", key=hash(r['Requirement'])):
-                        # Check if this requirement has a TBD issue
                         has_tbd = any(i.type == "TBD" for i in r["Issues"])
                         if has_tbd:
                             st.markdown(
@@ -267,15 +307,15 @@ with tab_quality:
                             )
                             st.info("This is not resolvable by AI. You must fill in the blank.")
                         with st.spinner("Proposing rewrite…"):
-                            # Call the LLM to suggest a rewrite, using the requirement and its issues
                             rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
                         st.markdown(f"**Rewrite:** {rewrite}")
 
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
 
+st.divider()
 with tab_tests:
-    st.subheader("💡 Test Ideas for Requirements")
+    st.markdown("## 🧪 Test Ideas for Requirements")
     try:
         docs = load_documents("data")
         requirement_rows = []
@@ -291,9 +331,9 @@ with tab_tests:
             st.info("No requirements detected.")
             st.stop()
 
+        st.divider()
         for r in requirement_rows:
             with st.expander(f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}"):
-                # Determine status based on issues
                 status = "ready"
                 issues = {i["type"] for i in r.get("Issues", [])}
                 if "TBD" in issues:
