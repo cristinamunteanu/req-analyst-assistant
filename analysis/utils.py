@@ -147,3 +147,96 @@ def parse_llm_content(llm_obj):
         return normalized, categories
     except Exception:
         return str(content), []
+
+def parse_requirement(raw_text):
+    """
+    Parse a requirement string into its components: ID, status, and main text.
+
+    Args:
+        raw_text (str): The raw requirement text.
+
+    Returns:
+        dict: {
+            "id": str or None,
+            "status": str ("missing", "defined", "undefined"),
+            "text": str
+        }
+
+    Example:
+        parse_requirement("CMP-SYNC-999: [MISSING] Legacy sync shim for offline mode. (Not defined in this document.)")
+        # {'id': 'CMP-SYNC-999', 'status': 'missing', 'text': '[MISSING] Legacy sync shim for offline mode. (Not defined in this document.)'}
+    """
+    # Match ID at the start (e.g., CMP-SYNC-999:)
+    match = re.match(r"^\s*([A-Z]+(?:-[A-Z]+)*-\d+)(?:\s*\([^)]+\))?\s*:\s*(.*)", raw_text)
+    if match:
+        req_id = match.group(1)
+        rest = match.group(2)
+        # Detect missing/placeholder status
+        if "[MISSING]" in rest or "Not defined in this document" in rest:
+            status = "missing"
+        else:
+            status = "defined"
+        return {"id": req_id, "status": status, "text": rest}
+    else:
+        # No ID found, treat as undefined
+        return {"id": None, "status": "undefined", "text": raw_text}
+
+VALID_PREFIXES = {"CMP", "SYS", "AUTH", "OPS", "TST"}  # Add all valid prefixes
+
+def is_valid_req_id(req_id):
+    prefix = req_id.split("-")[0]
+    return prefix in VALID_PREFIXES
+
+def analyze_dependencies(requirement_rows):
+    """
+    Analyze requirement dependencies for missing and circular references.
+
+    This function scans a list of requirement records, each expected to have a "Requirement" field
+    containing text with possible references to other requirements by their IDs (e.g., CMP-SEC-601).
+    It performs two main checks:
+      1. Detects referenced requirement IDs that are missing from the dataset.
+      2. Detects circular references, where two requirements reference each other.
+
+    Args:
+        requirement_rows (list of dict): Each dict should have a "Requirement" key containing the requirement text.
+
+    Returns:
+        missing_refs (set): Requirement IDs that are referenced but not defined in the dataset.
+        circular_refs (set of tuples): Tuples of (referenced_id, requirement_id) indicating circular references.
+
+    Example:
+        missing_refs, circular_refs = analyze_dependencies(requirement_rows)
+        # missing_refs: {'CMP-SEC-999'}
+        # circular_refs: {('CMP-SEC-601', 'CMP-SEC-602'), ...}
+    """
+    from collections import defaultdict
+    
+    id_to_reqs = defaultdict(list)
+    for r in requirement_rows:
+        req_text = r.get("Requirement", "")
+        parsed = parse_requirement(req_text)
+        if parsed["id"] and parsed["status"] == "defined":
+            id_to_reqs[parsed["id"]].append(r)
+
+    missing_refs = set()
+    id_pattern = re.compile(r"\b([A-Z]+(?:-[A-Z]+)*-\d+)\b")
+    
+    dependency_map = defaultdict(set)
+    for r in requirement_rows:
+        req_text = r.get("Requirement", "")
+        parsed = parse_requirement(req_text)
+        if parsed["id"] and parsed["status"] == "defined":
+            refs = id_pattern.findall(req_text)
+            refs = [ref for ref in refs if is_valid_req_id(ref) and ref != parsed["id"]]
+            dependency_map[parsed["id"]].update(refs)
+            for ref in refs:
+                if ref not in id_to_reqs:
+                    missing_refs.add(ref)
+
+    circular_refs = set()
+    for req_id, refs in dependency_map.items():
+        for ref in refs:
+            if ref in dependency_map and req_id in dependency_map[ref]:
+                circular_refs.add(tuple(sorted([req_id, ref])))
+
+    return missing_refs, circular_refs

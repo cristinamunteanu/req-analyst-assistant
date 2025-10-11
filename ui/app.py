@@ -2,6 +2,7 @@ import os
 import io
 import json
 import importlib
+import re
 
 import streamlit as st
 import pandas as pd
@@ -11,7 +12,7 @@ from ingestion.loader import load_documents
 from analysis.index import build_index
 from analysis.qa import make_qa
 from analysis.normalize_requirements import normalize_requirements
-from analysis.utils import split_into_requirements, is_requirement, parse_llm_content
+from analysis.utils import split_into_requirements, is_requirement, parse_llm_content, analyze_dependencies
 from analysis.heuristics import analyze_clarity
 from analysis.rewrites import suggest_rewrites
 from analysis.testgen import generate_test_ideas
@@ -60,6 +61,7 @@ log_buffer = io.StringIO()
 def log(msg):
     print(msg)
     log_buffer.write(str(msg) + "\n")
+
 
 st.title("🔎 RAG MVP")
 st.caption("Streamlit UI • LangChain • Unstructured • OpenAI/HF")
@@ -127,21 +129,32 @@ with tab_search:
         st.stop()
 
     query = col1.text_input("Ask a question about the files in `data/`")
+
+    # Set the flag to update the answer only if the query is new
+    if query and st.session_state.get("last_query") != query:
+        st.session_state["should_update_answer"] = True
+        st.session_state["last_query"] = query
+
     if query:
         try:
             with st.spinner("Thinking…"):
                 log(f"Calling QA chain with: {query}")
-                out = qa({"query": query})
-                log(f"QA chain output: {out}")
+                if st.session_state.get("should_update_answer", True):
+                    # Generate the answer
+                    out = qa({"query": query})
+                    st.session_state["answer"] = out.get("result", "No answer returned.")
+                    st.session_state["sources"] = [d.metadata.get("source", "unknown") for d in out.get("source_documents", [])]
+                    st.session_state["should_update_answer"] = False  # Reset after generating
+                    log(f"QA chain output: {out}")  # <-- Only log here
+                # No else: don't use 'out' outside this block
 
             # Before your answer section, reset feedback if a new query is entered
             if "last_query" not in st.session_state or st.session_state["last_query"] != query:
-                st.session_state["answer_feedback"] = None
                 st.session_state["last_query"] = query
 
             with st.container():
                 st.markdown("### 🟩 Answer")
-                answer = out.get("result", "No answer returned.")
+                answer = st.session_state.get("answer", "No answer returned.")
 
                 # Revert to plain markdown bullets for answer display
                 if isinstance(answer, list):
@@ -153,29 +166,31 @@ with tab_search:
 
             with st.container():
                 st.markdown("### 📄 Sources")
-                sources = {d.metadata.get("source", "unknown") for d in out.get("source_documents", [])}
+                sources = st.session_state.get("sources", [])
                 if len(sources) > 3:
                     with st.expander("View Sources"):
-                        for src in sources:
+                        for i, src in enumerate(sources):
                             if (src.startswith("data/") and os.path.exists(src)):
                                 with open(src, "rb") as f:
                                     st.download_button(
                                         label=f"Download {os.path.basename(src)}",
                                         data=f,
                                         file_name=os.path.basename(src),
-                                        mime="application/octet-stream"
+                                        mime="application/octet-stream",
+                                        key=f"download_{i}_{os.path.basename(src)}"  # <-- unique key
                                     )
                             else:
                                 st.write("•", src)
                 else:
-                    for src in sources:
+                    for i, src in enumerate(sources):
                         if (src.startswith("data/") and os.path.exists(src)):
                             with open(src, "rb") as f:
                                 st.download_button(
                                     label=f"Download {os.path.basename(src)}",
                                     data=f,
                                     file_name=os.path.basename(src),
-                                    mime="application/octet-stream"
+                                    mime="application/octet-stream",
+                                    key=f"download_{i}_{os.path.basename(src)}"  # <-- unique key
                                 )
                         else:
                             st.write("•", src)
@@ -259,6 +274,9 @@ with tab_quality:
 
         filtered = [r for r in requirement_rows if pass_filters(r["Issues"])]
 
+        # --- Dependency analysis BEFORE details loop ---
+        missing_refs, circular_refs = analyze_dependencies(requirement_rows)
+
         st.divider()
         st.markdown("### Table View")
         df = pd.DataFrame([
@@ -282,11 +300,26 @@ with tab_quality:
 
         st.divider()
         st.markdown("### Details & Suggested Rewrites")
-        for r in filtered:
+        for idx, r in enumerate(filtered):
             st.markdown(f'<div id="req-{abs(hash(r["Requirement"]))}"></div>', unsafe_allow_html=True)
             with st.expander(
-                f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}  •  Clarity {r['ClarityScore']}"
+                f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}  •  Clarity {r['ClarityScore']}",
+                expanded=False
             ):
+                req_text = r["Requirement"]
+                refs = re.findall(r"\b([A-Z]+-[A-Z]+-\d+)\b", req_text)
+                for ref in refs:
+                    if ref in missing_refs:
+                        st.markdown(
+                            f"<span style='color: #d9534f;'>🔗 Reference to missing requirement: <b>{ref}</b></span>",
+                            unsafe_allow_html=True
+                        )
+                    for circ_a, circ_b in circular_refs:
+                        if ref == circ_a or ref == circ_b:
+                            st.markdown(
+                                f"<span style='color: #f0ad4e;'>🔄 Circular reference detected involving <b>{ref}</b></span>",
+                                unsafe_allow_html=True
+                            )
                 if r["ClarityScore"] == 100:
                     st.markdown(
                         '<span style="color: #28a745; font-weight: bold; font-size: 1.1em;">✅ No issues detected</span>',
@@ -298,7 +331,7 @@ with tab_quality:
                             st.markdown(
                                 f"- **{i.type}** — {i.note}\n\n    ⟶ _“…{i.span}…”_"
                             )
-                    if st.button("💡 Suggest rewrite", key=hash(r['Requirement'])):
+                    if st.button("💡 Suggest rewrite", key=f"rewrite_{idx}_{hash(r['Requirement'])}"):
                         has_tbd = any(i.type == "TBD" for i in r["Issues"])
                         if has_tbd:
                             st.markdown(
@@ -309,6 +342,20 @@ with tab_quality:
                         with st.spinner("Proposing rewrite…"):
                             rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
                         st.markdown(f"**Rewrite:** {rewrite}")
+
+        
+        st.divider()
+        st.markdown("## 🔗 Dependency & Consistency Check")
+        # You can still show summary here if you want
+        if missing_refs:
+            st.warning(f"Referenced but missing requirement IDs: {', '.join(sorted(missing_refs))}")
+        else:
+            st.success("No missing requirement references detected.")
+
+        if circular_refs:
+            st.error(f"Circular references detected: {', '.join([f'{a} ↔ {b}' for a, b in circular_refs])}")
+        else:
+            st.success("No circular references detected.")
 
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
