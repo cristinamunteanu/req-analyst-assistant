@@ -16,6 +16,7 @@ from analysis.utils import split_into_requirements, is_requirement, parse_llm_co
 from analysis.heuristics import analyze_clarity
 from analysis.rewrites import suggest_rewrites
 from analysis.testgen import generate_test_ideas
+from analysis.traceability import build_trace_matrix, export_trace_matrix_csv
 
 
 st.set_page_config(page_title="RAG MVP", page_icon="🔎", layout="wide")
@@ -96,7 +97,9 @@ with st.sidebar:
     )
 
 # --- Tabbed layout ---
-tab_search, tab_summaries, tab_quality, tab_tests = st.tabs(["Search", "Summaries", "Quality", "Test ideas"])
+tab_search, tab_summaries, tab_quality, tab_tests, tab_traceability = st.tabs(
+    ["Search", "Summaries", "Quality", "Test ideas", "Traceability"]
+)
 
 
 with tab_search:
@@ -410,6 +413,35 @@ with tab_tests:
                     st.markdown("---")
     except Exception as e:
         st.error(f"Failed to generate test ideas: {e}")
+
+with tab_traceability:
+    st.markdown("## 📊 Traceability Matrix")
+    try:
+        docs = load_documents("data")
+        requirement_rows = []
+        for doc in docs:
+            for req in split_into_requirements(doc["text"]):
+                if is_requirement(req):
+                    requirement_rows.append({
+                        "Source": doc.get("source") or doc.get("path", "unknown"),
+                        "Requirement": req,
+                    })
+        if not requirement_rows:
+            st.info("No requirements detected.")
+            st.stop()
+
+        trace_df = build_trace_matrix(requirement_rows)
+        st.dataframe(trace_df, use_container_width=True)
+        csv_bytes = trace_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="Download Traceability Matrix CSV",
+            data=csv_bytes,
+            file_name="traceability_matrix.csv",
+            mime="text/csv",
+            key="trace_matrix_download"
+        )
+    except Exception as e:
+        st.error(f"Failed to generate traceability matrix: {e}")
 
 
 
