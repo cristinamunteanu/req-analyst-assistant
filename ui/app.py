@@ -8,11 +8,17 @@ import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
 
+# --- Project-specific imports ---
 from ingestion.loader import load_documents
 from analysis.index import build_index
 from analysis.qa import make_qa
 from analysis.normalize_requirements import normalize_requirements
-from analysis.utils import split_into_requirements, is_requirement, parse_llm_content, analyze_dependencies
+from analysis.utils import (
+    split_into_requirements,
+    is_requirement,
+    parse_llm_content,
+    analyze_dependencies,
+)
 from analysis.heuristics import analyze_clarity
 from analysis.rewrites import suggest_rewrites
 from analysis.testgen import generate_test_ideas
@@ -97,8 +103,8 @@ with st.sidebar:
     )
 
 # --- Tabbed layout ---
-tab_search, tab_summaries, tab_quality, tab_tests, tab_traceability = st.tabs(
-    ["Search", "Summaries", "Quality", "Test ideas", "Traceability"]
+tab_search, tab_summaries, tab_quality, tab_tests, tab_traceability, tab_dashboard = st.tabs(
+    ["Search", "Summaries", "Quality", "Test ideas", "Traceability", "Dashboard"]
 )
 
 
@@ -442,6 +448,60 @@ with tab_traceability:
         )
     except Exception as e:
         st.error(f"Failed to generate traceability matrix: {e}")
+
+with tab_dashboard:
+    st.markdown("## 📊 Requirements Dashboard")
+
+    # Load and normalize requirements
+    docs = load_documents("data")
+    requirement_chunks = []
+    for doc in docs:
+        requirements = split_into_requirements(doc["text"])
+        for req in requirements:
+            if is_requirement(req):
+                requirement_chunks.append({
+                    "text": req,
+                    "source": doc.get("source") or doc.get("path", "unknown")
+                })
+
+    # Use normalize_requirements to get categories
+    results = normalize_requirements(requirement_chunks)
+    total_reqs = len(results)
+    st.metric("Total Requirements", total_reqs)
+
+    # Use analyze_clarity for issue type detection
+    issue_counts = {"TBD": 0, "Ambiguous": 0, "NonVerifiable": 0, "PassiveVoice": 0}
+    for r in results:
+        clarity = analyze_clarity(r["text"])
+        types = {i.type for i in clarity["issues"]}
+        if "TBD" in types: issue_counts["TBD"] += 1
+        if "Ambiguous" in types: issue_counts["Ambiguous"] += 1
+        if "NonVerifiable" in types: issue_counts["NonVerifiable"] += 1
+        if "PassiveVoice" in types: issue_counts["PassiveVoice"] += 1
+
+    st.metric("% with TBD", f"{100 * issue_counts['TBD'] / total_reqs:.1f}%" if total_reqs else "0%")
+    st.metric("% Ambiguous", f"{100 * issue_counts['Ambiguous'] / total_reqs:.1f}%" if total_reqs else "0%")
+    st.metric("% Non-Verifiable", f"{100 * issue_counts['NonVerifiable'] / total_reqs:.1f}%" if total_reqs else "0%")
+    st.metric("% Passive Voice", f"{100 * issue_counts['PassiveVoice'] / total_reqs:.1f}%" if total_reqs else "0%")
+
+    # Coverage: how many SYS are CoveredBy at least one TST
+    requirement_rows = [
+        {"Source": r["source"], "Requirement": r["text"]}
+        for r in results
+    ]
+    trace_df = build_trace_matrix(requirement_rows)
+    sys_rows = trace_df[trace_df["Type"] == "System"]
+    sys_covered = sys_rows[sys_rows["CoveredBy"].apply(lambda x: any(tid.startswith("TST-") for tid in x.split(",") if tid.strip()))]
+    coverage_pct = 100 * len(sys_covered) / len(sys_rows) if len(sys_rows) else 0
+    st.metric("SYS Coverage by TST", f"{coverage_pct:.1f}%")
+
+    # Category distribution from normalize_requirements
+    all_categories = [cat for r in results for cat in r.get("categories", [])]
+    if all_categories:
+        cat_series = pd.Series(all_categories)
+        st.bar_chart(cat_series.value_counts())
+    else:
+        st.info("Category distribution not available (no categories found).")
 
 
 

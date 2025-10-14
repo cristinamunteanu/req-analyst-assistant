@@ -11,23 +11,6 @@ Features:
 - Parses "(covers ...)" relationships in test requirements.
 - Builds a pandas DataFrame representing the traceability matrix.
 - Exports the traceability matrix to CSV.
-
-Functions:
-    extract_req_id(text: str) -> str | None
-        Extracts the requirement ID from the start of a requirement text.
-
-    parse_dependencies(text: str) -> list[str]
-        Finds all requirement IDs referenced in "Depends on" clauses, excluding the current requirement's own ID.
-
-    parse_covers(text: str) -> list[str]
-        Extracts IDs from coverage clauses in test requirements, again excluding the current requirement's own ID.
-
-    build_trace_matrix(requirement_rows: List[Dict[str, Any]]) -> pd.DataFrame
-        Builds a pandas DataFrame representing the traceability matrix. Each row contains the requirement ID,
-        type (Test/System/Component), full text, source, dependencies, coverage links, and reverse coverage ("CoveredBy").
-
-    export_trace_matrix_csv(df: pd.DataFrame, path: str) -> str
-        Exports the traceability matrix DataFrame to a CSV file at the given path.
 """
 
 import re
@@ -37,6 +20,12 @@ from typing import List, Dict, Any
 REQ_ID_RE = re.compile(r'^([A-Z]{2,5}(?:-[A-Z]{2,10})?-\d{3,})')
 ANY_ID_RE = re.compile(r'[A-Z]{2,5}(?:-[A-Z]{2,10})?-\d{3,}')
 COVERS_RE = re.compile(r'\(covers ([^)]+)\)', re.IGNORECASE)
+
+def extract_req_ids(text: str) -> list[str]:
+    """
+    Extracts all requirement IDs from the given text.
+    """
+    return [x for x in ANY_ID_RE.findall(text)]
 
 def extract_req_id(text: str) -> str | None:
     """
@@ -51,37 +40,53 @@ def extract_req_id(text: str) -> str | None:
     m = REQ_ID_RE.match(text.strip())
     return m.group(1) if m else None
 
-def parse_dependencies(text: str) -> list[str]:
+def parse_relationships(text: str, keyword: str, group: str = None) -> list[str]:
     """
-    Finds all requirement IDs referenced in "Depends on" clauses, excluding the current requirement's own ID.
+    Generalized function to extract requirement IDs based on a keyword or regex group.
 
     Args:
         text (str): The requirement text.
+        keyword (str): Keyword to look for (e.g., "depends on").
+        group (str): Optional regex group to extract IDs from.
 
     Returns:
-        list[str]: List of referenced requirement IDs.
+        list[str]: List of referenced requirement IDs, excluding the current requirement's own ID.
     """
-    if "depends on" in text.lower():
-        ids = [x for x in ANY_ID_RE.findall(text)]
-        rid = extract_req_id(text)
-        return [i for i in ids if i != rid]
-    return []
+    rid = extract_req_id(text)
+    if group:
+        m = COVERS_RE.search(text)
+        if not m:
+            return []
+        ids = extract_req_ids(m.group(1))
+    else:
+        if keyword.lower() not in text.lower():
+            return []
+        ids = extract_req_ids(text)
+    return [i for i in ids if i != rid]
+
+def parse_dependencies(text: str) -> list[str]:
+    """
+    Finds all requirement IDs referenced in "Depends on" clauses, excluding the current requirement's own ID.
+    """
+    return parse_relationships(text, "depends on")
 
 def parse_covers(text: str) -> list[str]:
     """
     Extracts IDs from coverage clauses in test requirements, again excluding the current requirement's own ID.
-
-    Args:
-        text (str): The requirement text.
-
-    Returns:
-        list[str]: List of covered requirement IDs.
     """
-    m = COVERS_RE.search(text)
-    if not m: return []
-    ids = [x.strip() for x in ANY_ID_RE.findall(m.group(1))]
-    rid = extract_req_id(text)
-    return [i for i in ids if i != rid]
+    return parse_relationships(text, "", group="covers")
+
+def get_req_type(rid: str) -> str:
+    """
+    Determines the requirement type based on its ID prefix.
+    """
+    if rid.startswith("TST-"):
+        return "Test"
+    elif rid.startswith("SYS-"):
+        return "System"
+    elif rid:
+        return "Component"
+    return ""
 
 def build_trace_matrix(requirement_rows: List[Dict[str, Any]]) -> pd.DataFrame:
     """
@@ -106,7 +111,7 @@ def build_trace_matrix(requirement_rows: List[Dict[str, Any]]) -> pd.DataFrame:
     for r in requirement_rows:
         txt = r["Requirement"]
         rid = extract_req_id(txt) or ""
-        typ = ("Test" if rid.startswith("TST-") else ("System" if rid.startswith("SYS-") else "Component"))
+        typ = get_req_type(rid)
         deps = parse_dependencies(txt)
         covers = parse_covers(txt)
         rows.append({
