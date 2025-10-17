@@ -25,7 +25,10 @@ from analysis.testgen import generate_test_ideas
 from analysis.traceability import build_trace_matrix, export_trace_matrix_csv
 
 
-st.set_page_config(page_title="RAG MVP", page_icon="🔎", layout="wide")
+DEBUG = True  # Set to False to disable debug prints
+
+st.set_page_config(page_title="Requirements Analyst Assistant", page_icon="🔎", layout="wide")
+
 load_dotenv()
 
 if "openai_model" not in st.session_state:
@@ -40,7 +43,8 @@ def _get_embed_model():
 def get_index():
     with st.spinner("Parsing & indexing documents…"):
         docs = load_documents("data")
-        print(f"Loaded documents: {docs}")
+        if DEBUG:
+            print(f"Loaded documents: {docs}")
         return build_index(docs, embed_model=_get_embed_model())
 
 def is_installed(pkg):
@@ -62,22 +66,59 @@ def available_llm_providers():
         providers.append("ollama")
     return providers
 
-# --- Add a log buffer ---
-log_buffer = io.StringIO()
+# --- Utility: Get requirements from docs ---
+def get_requirement_rows():
+    docs = load_documents("data")
+    requirement_rows = []
+    for doc in docs:
+        for req in split_into_requirements(doc["text"]):
+            if is_requirement(req):
+                requirement_rows.append({
+                    "Source": doc.get("source") or doc.get("path", "unknown"),
+                    "Requirement": req,
+                })
+    return requirement_rows
 
-def log(msg):
-    print(msg)
-    log_buffer.write(str(msg) + "\n")
+# --- Cache normalized requirements for reuse across tabs ---
+@st.cache_data(show_spinner=True)
+def get_normalized_requirements():
+    requirement_rows = get_requirement_rows()
+    requirement_chunks = [
+        {"text": r["Requirement"], "source": r["Source"]}
+        for r in requirement_rows
+    ]
+    return normalize_requirements(requirement_chunks)
 
+@st.cache_data(show_spinner=True)
+def get_clarity_results():
+    results = get_normalized_requirements()
+    clarity_rows = []
+    for r in results:
+        clarity = analyze_clarity(r["text"])
+        clarity_rows.append({
+            "Source": r["source"],
+            "Requirement": r["text"],
+            "ClarityScore": clarity["clarity_score"],
+            "Issues": clarity["issues"]
+        })
+    return clarity_rows
 
-st.title("🔎 RAG MVP")
-st.caption("Streamlit UI • LangChain • Unstructured • OpenAI/HF")
+# --- UI code starts here ---
+st.title("🔎 Requirements Analyst Assistant")
 
-# At the very top of your Streamlit app (after st.title or st.caption), add an anchor:
 st.markdown('<div id="top"></div>', unsafe_allow_html=True)
-
 st.markdown("""
     <style>
+    /* Make Streamlit tabs larger and more prominent */
+    [data-testid="stTabs"] button {
+        font-size: 1.2em !important;
+        padding: 0.75em 2em !important;
+        font-weight: bold !important;
+    }
+    [data-testid="stTabs"] {
+        margin-bottom: 1.5em !important;
+    }
+    
     pre {
         white-space: pre-wrap !important;
         word-break: break-word !important;
@@ -85,11 +126,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Logs expander in sidebar ---
-with st.sidebar.expander("Logs", expanded=False):
-    st.code(log_buffer.getvalue() or "No logs yet.", language="text")
-
-# --- Back to top button in sidebar ---
 with st.sidebar:
     st.markdown(
         """
@@ -102,11 +138,44 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-# --- Tabbed layout ---
 tab_search, tab_summaries, tab_quality, tab_tests, tab_traceability, tab_dashboard = st.tabs(
     ["Search", "Summaries", "Quality", "Test ideas", "Traceability", "Dashboard"]
 )
 
+def show_sources(sources):
+    unique_sources = []
+    seen = set()
+    for src in sources:
+        if src not in seen:
+            unique_sources.append(src)
+            seen.add(src)
+    if len(unique_sources) > 3:
+        with st.expander("View Sources"):
+            for i, src in enumerate(unique_sources):
+                if (src.startswith("data/") and os.path.exists(src)):
+                    with open(src, "rb") as f:
+                        st.download_button(
+                            label=f"Download {os.path.basename(src)}",
+                            data=f,
+                            file_name=os.path.basename(src),
+                            mime="application/octet-stream",
+                            key=f"download_{i}_{os.path.basename(src)}"
+                        )
+                else:
+                    st.write("•", src)
+    else:
+        for i, src in enumerate(unique_sources):
+            if (src.startswith("data/") and os.path.exists(src)):
+                with open(src, "rb") as f:
+                    st.download_button(
+                        label=f"Download {os.path.basename(src)}",
+                        data=f,
+                        file_name=os.path.basename(src),
+                        mime="application/octet-stream",
+                        key=f"download_{i}_{os.path.basename(src)}"
+                    )
+            else:
+                st.write("•", src)
 
 with tab_search:
     st.markdown("## 🔍 Search")
@@ -119,27 +188,30 @@ with tab_search:
     index = get_index()
     if index is None:
         st.error("Failed to build the document index. Please check your embedding model, input data, and logs for errors.")
-        log("Failed to build the document index. Please check your embedding model, input data, and logs for errors.")
+        if DEBUG:
+            print("Failed to build the document index. Please check your embedding model, input data, and logs for errors.")
         st.stop()
 
     try:
         retriever = index.as_retriever(search_kwargs={"k": 4})
-        log(f"Retriever created: {retriever}")
+        if DEBUG:
+            print(f"Retriever created: {retriever}")
     except Exception as e:
         st.error(f"Failed to create retriever: {e}")
-        log(f"Failed to create retriever: {e}")
+        if DEBUG:
+            print(f"Failed to create retriever: {e}")
         st.stop()
 
     qa = make_qa(retriever)
-    log(f"QA chain created: {qa}")
+    if DEBUG:
+        print(f"QA chain created: {qa}")
     if qa is None:
         st.error("QA chain was not created. Please check your retriever and LLM setup.")
-        log("QA chain was not created. Please check your retriever and LLM setup.")
+        print("QA chain was not created. Please check your retriever and LLM setup.")
         st.stop()
 
     query = col1.text_input("Ask a question about the files in `data/`")
 
-    # Set the flag to update the answer only if the query is new
     if query and st.session_state.get("last_query") != query:
         st.session_state["should_update_answer"] = True
         st.session_state["last_query"] = query
@@ -149,23 +221,18 @@ with tab_search:
             with st.spinner("Thinking…"):
                 log(f"Calling QA chain with: {query}")
                 if st.session_state.get("should_update_answer", True):
-                    # Generate the answer
                     out = qa({"query": query})
                     st.session_state["answer"] = out.get("result", "No answer returned.")
                     st.session_state["sources"] = [d.metadata.get("source", "unknown") for d in out.get("source_documents", [])]
-                    st.session_state["should_update_answer"] = False  # Reset after generating
-                    log(f"QA chain output: {out}")  # <-- Only log here
-                # No else: don't use 'out' outside this block
+                    st.session_state["should_update_answer"] = False
+                    log(f"QA chain output: {out}")
 
-            # Before your answer section, reset feedback if a new query is entered
             if "last_query" not in st.session_state or st.session_state["last_query"] != query:
                 st.session_state["last_query"] = query
 
             with st.container():
                 st.markdown("### 🟩 Answer")
                 answer = st.session_state.get("answer", "No answer returned.")
-
-                # Revert to plain markdown bullets for answer display
                 if isinstance(answer, list):
                     for req in answer:
                         desc = req.get("description", "")
@@ -176,33 +243,7 @@ with tab_search:
             with st.container():
                 st.markdown("### 📄 Sources")
                 sources = st.session_state.get("sources", [])
-                if len(sources) > 3:
-                    with st.expander("View Sources"):
-                        for i, src in enumerate(sources):
-                            if (src.startswith("data/") and os.path.exists(src)):
-                                with open(src, "rb") as f:
-                                    st.download_button(
-                                        label=f"Download {os.path.basename(src)}",
-                                        data=f,
-                                        file_name=os.path.basename(src),
-                                        mime="application/octet-stream",
-                                        key=f"download_{i}_{os.path.basename(src)}"  # <-- unique key
-                                    )
-                            else:
-                                st.write("•", src)
-                else:
-                    for i, src in enumerate(sources):
-                        if (src.startswith("data/") and os.path.exists(src)):
-                            with open(src, "rb") as f:
-                                st.download_button(
-                                    label=f"Download {os.path.basename(src)}",
-                                    data=f,
-                                    file_name=os.path.basename(src),
-                                    mime="application/octet-stream",
-                                    key=f"download_{i}_{os.path.basename(src)}"  # <-- unique key
-                                )
-                        else:
-                            st.write("•", src)
+                show_sources(sources)
         except Exception as e:
             st.error(f"An error occurred while processing your question: {e}")
             import traceback
@@ -213,20 +254,8 @@ with tab_search:
 with tab_summaries:
     st.markdown("## 📋 Requirement Normalization & Categorization")
     try:
-        docs = load_documents("data")
-        requirement_chunks = []
-        for doc in docs:
-            requirements = split_into_requirements(doc["text"])
-            for req in requirements:
-                if is_requirement(req):
-                    requirement_chunks.append({
-                        "text": req,
-                        "source": doc.get("source") or doc.get("path", "unknown")
-                    })
-
-        results = normalize_requirements(requirement_chunks)
+        results = get_normalized_requirements()
         if results:
-            import pandas as pd
             df = pd.DataFrame([
                 {
                     "Source": r["source"],
@@ -238,7 +267,8 @@ with tab_summaries:
             ])
             st.dataframe(df, use_container_width=True)
             for r in results:
-                print("NORMALIZED FIELD:", repr(r["normalized"]))
+                if DEBUG:
+                    print("NORMALIZED FIELD:", repr(r["normalized"]))
                 break
         else:
             st.info("No requirements processed.")
@@ -248,123 +278,141 @@ with tab_summaries:
 with tab_quality:
     st.markdown("## 🧹 Clarity & Ambiguity Checks")
     try:
-        docs = load_documents("data")
-        requirement_rows = []
-        for doc in docs:
-            for req in split_into_requirements(doc["text"]):
-                if is_requirement(req):
-                    result = analyze_clarity(req)
-                    requirement_rows.append({
-                        "Source": doc.get("source") or doc.get("path", "unknown"),
-                        "Requirement": req,
-                        "ClarityScore": result["clarity_score"],
-                        "Issues": result["issues"]
-                    })
-
+        requirement_rows = get_clarity_results()
         if not requirement_rows:
             st.info("No requirements detected.")
             st.stop()
 
-        st.divider()
-        st.caption("### Filters")
-        colA, colB, colC, colD = st.columns(4)
-        f_amb = colA.toggle("Ambiguous", value=True)
-        f_pass = colB.toggle("Passive voice", value=True)
-        f_tbd = colC.toggle("TBD", value=True)
-        f_nonv = colD.toggle("Non-verifiable", value=True)
-
-        def pass_filters(issues):
-            types = {i.type for i in issues}
-            if not f_amb and "Ambiguous" in types: return False
-            if not f_pass and "PassiveVoice" in types: return False
-            if not f_tbd and "TBD" in types: return False
-            if not f_nonv and "NonVerifiable" in types: return False
-            return True
-
-        filtered = [r for r in requirement_rows if pass_filters(r["Issues"])]
-
-        # --- Dependency analysis BEFORE details loop ---
+        # Calculate dependencies once for all subtabs
         missing_refs, circular_refs = analyze_dependencies(requirement_rows)
 
-        st.divider()
-        st.markdown("### Table View")
-        df = pd.DataFrame([
-            {
-                "Clarity": r["ClarityScore"],
-                "Requirement": r["Requirement"],
-                "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "—",
-                "Source": r["Source"],
-                "Details": (
-                    f'<a href="#req-{abs(hash(r["Requirement"]))}">🔎 Details & Rewrite</a>'
-                    if r["ClarityScore"] < 100 else ""
-                ),
-            }
-            for r in filtered
-        ]).sort_values(by=["Clarity", "Issues"], ascending=[True, True])
-
-        st.write(
-            df.to_html(escape=False, index=False),
-            unsafe_allow_html=True,
+        # Create sub-tabs for the Quality tab
+        subtab_table, subtab_details, subtab_dependency = st.tabs(
+            ["Table View", "Details & Suggested Rewrites", "Dependency & Consistency Check"]
         )
 
-        st.divider()
-        st.markdown("### Details & Suggested Rewrites")
-        for idx, r in enumerate(filtered):
-            st.markdown(f'<div id="req-{abs(hash(r["Requirement"]))}"></div>', unsafe_allow_html=True)
-            with st.expander(
-                f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}  •  Clarity {r['ClarityScore']}",
-                expanded=False
-            ):
-                req_text = r["Requirement"]
-                refs = re.findall(r"\b([A-Z]+-[A-Z]+-\d+)\b", req_text)
-                for ref in refs:
-                    if ref in missing_refs:
+        with subtab_table:
+            st.caption("Filters")
+            colA, colB, colC, colD = st.columns(4)
+            f_amb = colA.toggle("Ambiguous", value=True)
+            f_pass = colB.toggle("Passive voice", value=True)
+            f_tbd = colC.toggle("TBD", value=True)
+            f_nonv = colD.toggle("Non-verifiable", value=True)
+
+            def pass_filters(issues):
+                types = {i.type for i in issues}
+                if not f_amb and "Ambiguous" in types: return False
+                if not f_pass and "PassiveVoice" in types: return False
+                if not f_tbd and "TBD" in types: return False
+                if not f_nonv and "NonVerifiable" in types: return False
+                return True
+
+            filtered = [r for r in requirement_rows if pass_filters(r["Issues"])]
+
+            df = pd.DataFrame([
+                {
+                    "Clarity": r["ClarityScore"],
+                    "Requirement": r["Requirement"],
+                    "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "—",
+                    "Source": r["Source"],
+                    "Details": (
+                        f'<a href="#req-{abs(hash(r["Requirement"]))}">Details & Rewrite</a>'
+                        if r["ClarityScore"] < 100 else ""
+                    ),
+                }
+                for r in filtered
+            ]).sort_values(by=["Clarity", "Issues"], ascending=[True, True])
+
+            # Reduced heading size and consistent capitalization
+            st.markdown(
+                f"""
+                <div style="
+                    background: #f7f7f9;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                    padding: 1.5em 1em 1em 1em;
+                    margin-bottom: 1em;
+                ">
+                    {df.to_html(escape=False, index=False)}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with subtab_details:
+            st.divider()
+            st.markdown("### Details & Suggested Rewrites")
+
+            PAGE_SIZE = 5
+            if "details_limit" not in st.session_state:
+                st.session_state["details_limit"] = PAGE_SIZE
+
+            limit = st.session_state["details_limit"]
+
+            for idx, r in enumerate(filtered[:limit]):
+                show_details_key = f"show_details_{idx}_{hash(r['Requirement'])}"
+                details_state_key = f"{show_details_key}_state"
+                rewrite_btn_key = f"rewrite_btn_{idx}_{hash(r['Requirement'])}"
+                rewrite_state_key = f"rewrite_state_{idx}_{hash(r['Requirement'])}"
+
+                expander_label = f"📝 {r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''} • Clarity {r['ClarityScore']}"
+                with st.expander(expander_label, expanded=False):
+                    # Show status badge and main issues only
+                    if r["ClarityScore"] == 100:
                         st.markdown(
-                            f"<span style='color: #d9534f;'>🔗 Reference to missing requirement: <b>{ref}</b></span>",
+                            '<span style="color: #28a745; font-weight: bold; font-size: 1.1em;">✅ No issues detected</span>',
                             unsafe_allow_html=True
                         )
-                    for circ_a, circ_b in circular_refs:
-                        if ref == circ_a or ref == circ_b:
-                            st.markdown(
-                                f"<span style='color: #f0ad4e;'>🔄 Circular reference detected involving <b>{ref}</b></span>",
-                                unsafe_allow_html=True
-                            )
-                if r["ClarityScore"] == 100:
-                    st.markdown(
-                        '<span style="color: #28a745; font-weight: bold; font-size: 1.1em;">✅ No issues detected</span>',
-                        unsafe_allow_html=True
-                    )
-                else:
-                    if r["Issues"]:
-                        for i in r["Issues"]:
-                            st.markdown(
-                                f"- **{i.type}** — {i.note}\n\n    ⟶ _“…{i.span}…”_"
-                            )
-                    if st.button("💡 Suggest rewrite", key=f"rewrite_{idx}_{hash(r['Requirement'])}"):
-                        has_tbd = any(i.type == "TBD" for i in r["Issues"])
-                        if has_tbd:
-                            st.markdown(
-                                '<span style="color: #d9534f; font-weight: bold; font-size: 1.1em;">🚩 TBD — requires clarification</span>',
-                                unsafe_allow_html=True
-                            )
-                            st.info("This is not resolvable by AI. You must fill in the blank.")
-                        with st.spinner("Proposing rewrite…"):
-                            rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
-                        st.markdown(f"**Rewrite:** {rewrite}")
+                    else:
+                        main_issues = [i.type for i in r["Issues"]]
+                        st.markdown(f"**🔎 Main issues:** <span style='color:#d9534f'>{', '.join(main_issues)}</span>", unsafe_allow_html=True)
 
-        
-        st.divider()
-        st.markdown("## 🔗 Dependency & Consistency Check")
-        # You can still show summary here if you want
-        if missing_refs:
-            st.warning(f"Referenced but missing requirement IDs: {', '.join(sorted(missing_refs))}")
-        else:
-            st.success("No missing requirement references detected.")
+                        # Show details and rewrite only when button is pressed
+                        if st.button("🔍 Show details", key=show_details_key):
+                            st.session_state[details_state_key] = True
 
-        if circular_refs:
-            st.error(f"Circular references detected: {', '.join([f'{a} ↔ {b}' for a, b in circular_refs])}")
-        else:
-            st.success("No circular references detected.")
+                        if st.session_state.get(details_state_key, False):
+                            st.markdown("---")
+                            st.markdown("#### 🗂️ Issue Details")
+                            for i in r["Issues"]:
+                                st.markdown(
+                                    f"- <span style='color:#f0ad4e'><b>{i.type}</b></span> — {i.note}<br>&nbsp;&nbsp;&nbsp;&nbsp;_“…{i.span}…”_", unsafe_allow_html=True
+                                )
+                            st.markdown("---")
+                            if st.button("✨ Suggest rewrite", key=rewrite_btn_key):
+                                has_tbd = any(i.type == "TBD" for i in r["Issues"])
+                                if has_tbd:
+                                    st.markdown(
+                                        '<span style="color: #d9534f; font-weight: bold; font-size: 1.1em;">🚩 TBD — requires clarification</span>',
+                                        unsafe_allow_html=True
+                                    )
+                                    st.info("This is not resolvable by AI. You must fill in the blank.")
+                                with st.spinner("Proposing rewrite…"):
+                                    rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
+                                st.session_state[rewrite_state_key] = rewrite
+
+                            if rewrite_state_key in st.session_state:
+                                st.markdown("#### ✏️ <span style='color:#0072B2'>Rewrite</span>", unsafe_allow_html=True)
+                                st.info(st.session_state[rewrite_state_key])
+
+            # Place the button AFTER the requirements list
+            if limit < len(filtered):
+                if st.button("Show more requirements", key=f"show_more_requirements_{limit}"):
+                    st.session_state["details_limit"] += PAGE_SIZE
+                    st.rerun()  # Ensures immediate update after button press
+
+        with subtab_dependency:
+            st.divider()
+            st.markdown("## 🔗 Dependency & Consistency Check")
+            if missing_refs:
+                st.warning(f"Referenced but missing requirement IDs: {', '.join(sorted(missing_refs))}")
+            else:
+                st.success("No missing requirement references detected.")
+
+            if circular_refs:
+                st.error(f"Circular references detected: {', '.join([f'{a} ↔ {b}' for a, b in circular_refs])}")
+            else:
+                st.success("No circular references detected.")
 
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
@@ -373,16 +421,7 @@ st.divider()
 with tab_tests:
     st.markdown("## 🧪 Test Ideas for Requirements")
     try:
-        docs = load_documents("data")
-        requirement_rows = []
-        for doc in docs:
-            for req in split_into_requirements(doc["text"]):
-                if is_requirement(req):
-                    requirement_rows.append({
-                        "Source": doc.get("source") or doc.get("path", "unknown"),
-                        "Requirement": req,
-                    })
-
+        requirement_rows = get_requirement_rows()
         if not requirement_rows:
             st.info("No requirements detected.")
             st.stop()
@@ -423,15 +462,7 @@ with tab_tests:
 with tab_traceability:
     st.markdown("## 📊 Traceability Matrix")
     try:
-        docs = load_documents("data")
-        requirement_rows = []
-        for doc in docs:
-            for req in split_into_requirements(doc["text"]):
-                if is_requirement(req):
-                    requirement_rows.append({
-                        "Source": doc.get("source") or doc.get("path", "unknown"),
-                        "Requirement": req,
-                    })
+        requirement_rows = get_requirement_rows()
         if not requirement_rows:
             st.info("No requirements detected.")
             st.stop()
@@ -452,28 +483,14 @@ with tab_traceability:
 with tab_dashboard:
     st.markdown("## 📊 Requirements Dashboard")
 
-    # Load and normalize requirements
-    docs = load_documents("data")
-    requirement_chunks = []
-    for doc in docs:
-        requirements = split_into_requirements(doc["text"])
-        for req in requirements:
-            if is_requirement(req):
-                requirement_chunks.append({
-                    "text": req,
-                    "source": doc.get("source") or doc.get("path", "unknown")
-                })
-
-    # Use normalize_requirements to get categories
-    results = normalize_requirements(requirement_chunks)
+    results = get_normalized_requirements()
     total_reqs = len(results)
     st.metric("Total Requirements", total_reqs)
 
-    # Use analyze_clarity for issue type detection
+    clarity_rows = get_clarity_results()
     issue_counts = {"TBD": 0, "Ambiguous": 0, "NonVerifiable": 0, "PassiveVoice": 0}
-    for r in results:
-        clarity = analyze_clarity(r["text"])
-        types = {i.type for i in clarity["issues"]}
+    for r in clarity_rows:
+        types = {i.type for i in r["Issues"]}
         if "TBD" in types: issue_counts["TBD"] += 1
         if "Ambiguous" in types: issue_counts["Ambiguous"] += 1
         if "NonVerifiable" in types: issue_counts["NonVerifiable"] += 1
@@ -484,7 +501,6 @@ with tab_dashboard:
     st.metric("% Non-Verifiable", f"{100 * issue_counts['NonVerifiable'] / total_reqs:.1f}%" if total_reqs else "0%")
     st.metric("% Passive Voice", f"{100 * issue_counts['PassiveVoice'] / total_reqs:.1f}%" if total_reqs else "0%")
 
-    # Coverage: how many SYS are CoveredBy at least one TST
     requirement_rows = [
         {"Source": r["source"], "Requirement": r["text"]}
         for r in results
@@ -495,7 +511,6 @@ with tab_dashboard:
     coverage_pct = 100 * len(sys_covered) / len(sys_rows) if len(sys_rows) else 0
     st.metric("SYS Coverage by TST", f"{coverage_pct:.1f}%")
 
-    # Category distribution from normalize_requirements
     all_categories = [cat for r in results for cat in r.get("categories", [])]
     if all_categories:
         cat_series = pd.Series(all_categories)
