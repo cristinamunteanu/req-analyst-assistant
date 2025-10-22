@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from analysis.qa import make_llm 
 
 REWRITE_PROMPT = """You are a senior requirements engineer.

@@ -5,7 +5,7 @@ import re
 import json
 import traceback
 from typing import List, Dict, Any
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from analysis.qa import make_llm
 
 NORMALIZE_PROMPT = """You are a requirements analyst assistant.

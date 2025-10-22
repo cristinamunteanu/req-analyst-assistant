@@ -33,8 +33,9 @@ Usage Example:
 
 import os
 from typing import Any, Dict
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 SYSTEM = "You are a careful assistant. Cite sources by file path where relevant."
 
@@ -94,9 +95,46 @@ def make_llm():
         print(f"Error initializing LLM for provider '{provider}': {e}")
         raise
 
+def format_docs(docs):
+    """Format retrieved documents into a single context string."""
+    return "\n\n".join(doc.page_content for doc in docs)
+
+class QAChain:
+    """Wrapper class to maintain compatibility with the old RetrievalQA interface."""
+    
+    def __init__(self, retriever, llm, prompt):
+        self.retriever = retriever
+        self.llm = llm
+        self.prompt = prompt
+        
+        # Create the chain using the new LCEL syntax
+        self.rag_chain = (
+            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+    
+    def __call__(self, inputs):
+        """Call the chain with inputs, maintaining backward compatibility."""
+        question = inputs.get("query") or inputs.get("question")
+        if not question:
+            raise ValueError("No question provided in inputs")
+        
+        # Get the answer
+        result = self.rag_chain.invoke(question)
+        
+        # Get source documents using the correct retriever method
+        source_documents = self.retriever.invoke(question)
+        
+        return {
+            "result": result,
+            "source_documents": source_documents
+        }
+
 def make_qa(retriever) -> Any:
     """
-    Builds a RetrievalQA chain using the selected language model (LLM), a retriever, and a custom prompt.
+    Builds a retrieval-augmented QA chain using the selected language model (LLM), a retriever, and a custom prompt.
 
     The chain uses the LLM to answer questions based on context retrieved by the retriever.
     The prompt instructs the assistant to answer concisely and cite sources by file path.
@@ -105,8 +143,8 @@ def make_qa(retriever) -> Any:
         retriever: A retriever instance compatible with LangChain, used to fetch relevant documents/context.
 
     Returns:
-        RetrievalQA: A LangChain RetrievalQA chain configured with the LLM, retriever, and prompt.
-                     The chain returns both the answer and the source documents used.
+        QAChain: A wrapper around the LangChain chain that maintains backward compatibility.
+                 The chain returns both the answer and the source documents used.
 
     Raises:
         Exception: If LLM initialization or chain construction fails.
@@ -114,24 +152,19 @@ def make_qa(retriever) -> Any:
     Example:
         retriever = ...  # Your retriever instance
         qa_chain = make_qa(retriever)
-        result = qa_chain({"question": "What is the project about?"})
+        result = qa_chain({"query": "What is the project about?"})
         print(result["result"])
         print(result["source_documents"])
     """
     try:
         prompt = PromptTemplate(
-            input_variables=["system", "question", "context"],
+            input_variables=["question", "context"],
             template=TEMPLATE,
             partial_variables={"system": SYSTEM},
         )
         llm = make_llm()
-        return RetrievalQA.from_chain_type(
-            llm=llm,
-            retriever=retriever,
-            chain_type="stuff",
-            chain_type_kwargs={"prompt": prompt},
-            return_source_documents=True,
-        )
+        
+        return QAChain(retriever, llm, prompt)
     except Exception as e:
-        print(f"Error initializing RetrievalQA chain: {e}")
+        print(f"Error initializing QA chain: {e}")
         raise

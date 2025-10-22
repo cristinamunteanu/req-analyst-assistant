@@ -1,8 +1,14 @@
 pyproject.toml
 setup.py
 analysis/__init__.py
+analysis/heuristics.py
 analysis/index.py
+analysis/normalize_requirements.py
 analysis/qa.py
+analysis/rewrites.py
+analysis/testgen.py
+analysis/traceability.py
+analysis/utils.py
 ingestion/__init__.py
 ingestion/loader.py
 req_analyst_assistant.egg-info/PKG-INFO
