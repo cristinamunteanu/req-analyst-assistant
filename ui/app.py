@@ -239,6 +239,22 @@ st.markdown("""
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
     }
     
+    /* Clear button specific styling */
+    [data-testid="column"]:nth-child(2) .stButton {
+        margin-top: -40px;
+    }
+    
+    [data-testid="column"]:nth-child(2) .stButton > button {
+        background: #ef4444 !important;
+        padding: 0.5rem !important;
+        font-size: 1rem !important;
+        min-height: 32px !important;
+    }
+    
+    [data-testid="column"]:nth-child(2) .stButton > button:hover {
+        background: #dc2626 !important;
+    }
+    
     /* Enhanced input styling */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
@@ -507,21 +523,27 @@ with st.sidebar:
     
     # Search input with enhanced styling
     col1, col2 = st.columns([3.5, 1])
+    
+    # Get or initialize search instance counter
+    search_instance = st.session_state.get('search_instance', 0)
+    
     with col1:
         search_query = st.text_input(
             "Search all requirements:",
             placeholder="e.g., performance, security, user...",
-            key="unified_search",
+            key=f"unified_search_{search_instance}",
             label_visibility="collapsed",
             help="Enter keywords to filter requirements across all tabs"
         )
     with col2:
-        st.markdown('<div style="margin-top: -52px; padding-top: 8px;">', unsafe_allow_html=True)
         if st.button("🗑️", key="clear_unified_search", help="Clear search"):
-            if 'unified_search' in st.session_state:
-                del st.session_state['unified_search']
+            # Increment search instance to create a new text input widget
+            st.session_state['search_instance'] = st.session_state.get('search_instance', 0) + 1
+            # Clear any old search states
+            keys_to_clear = [k for k in st.session_state.keys() if k.startswith('unified_search_')]
+            for key in keys_to_clear:
+                del st.session_state[key]
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
     
     # Search status with enhanced styling
     if search_query:
@@ -538,31 +560,31 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
     
-    # Document information
+    # Document information - showing only file names
     st.markdown("---")
-    st.markdown("**📄 Document Info:**")
+    st.markdown("**📄 Documents Loaded:**")
     
-    # Get basic stats to display
+    # Show only document names
     try:
         docs = load_documents("data")
-        doc_count = len(docs) if docs else 0
-        st.metric("📄 Documents Loaded", doc_count)
-        
-        if doc_count > 0:
-            # Show document types
-            doc_types = set()
+        if docs:
+            doc_names = []
             for doc in docs:
-                source = doc.get("source", "")
+                source = doc.get("source", "") or doc.get("path", "")
                 if source:
-                    ext = source.split('.')[-1].upper() if '.' in source else "Unknown"
-                    doc_types.add(ext)
+                    # Remove "data/" prefix if present
+                    doc_name = source.replace("data/", "") if source.startswith("data/") else source
+                    doc_names.append(doc_name)
             
-            if doc_types:
-                st.markdown(f"**� File Types:** {', '.join(sorted(doc_types))}")
-    except Exception:
-        st.markdown("*Stats will appear once documents are loaded*")
-    
-    # Simple help
+            if doc_names:
+                for name in sorted(doc_names):
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {name}", unsafe_allow_html=True)
+            else:
+                st.markdown("*No document names found*")
+        else:
+            st.markdown("*No documents loaded*")
+    except Exception as e:
+        st.markdown(f"*Error loading documents: {str(e)}*")
     
     # Help Section
     st.markdown("""
@@ -575,16 +597,11 @@ with st.sidebar:
             </div>
         </div>
     """, unsafe_allow_html=True)
-    
-    # Simple help
-    st.markdown("---")
-    st.markdown("**💡 Tips:**")
-    st.markdown("• Search applies to all tabs")
-    st.markdown("• Use 🗑️ to clear search") 
-    st.markdown("• Switch tabs to see different views")
 
 # Define the unified search query for all tabs to use
-unified_search_query = st.session_state.get("unified_search", "")
+search_instance = st.session_state.get('search_instance', 0)
+unified_search_query = st.session_state.get(f'unified_search_{search_instance}', "")
+search_trigger = st.session_state.get('search_trigger', 0)  # Used to force re-execution
 search_summaries = unified_search_query
 search_quality = unified_search_query
 search_tests = unified_search_query
@@ -818,10 +835,26 @@ with tab_quality:
         if search_quality:
             search_terms = search_quality.lower().split()
             filtered_requirement_rows = []
+            
+            # Get the original normalized data for more comprehensive search
+            normalized_results = get_normalized_requirements()
+            
             for r in requirement_rows:
+                # Find the corresponding normalized data for this requirement
+                normalized_data = None
+                for norm_r in normalized_results:
+                    if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
+                        normalized_data = norm_r
+                        break
+                
+                # Search in requirement text, source, normalized text, and categories
                 text_to_search = f"{r['Requirement']} {r['Source']}".lower()
+                if normalized_data:
+                    text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
+                
                 if all(term in text_to_search for term in search_terms):
                     filtered_requirement_rows.append(r)
+            
             requirement_rows = filtered_requirement_rows
             
             if not requirement_rows:
@@ -972,10 +1005,26 @@ with tab_tests:
         if search_tests:
             search_terms = search_tests.lower().split()
             filtered_requirement_rows = []
+            
+            # Get the original normalized data for more comprehensive search
+            normalized_results = get_normalized_requirements()
+            
             for r in requirement_rows:
+                # Find the corresponding normalized data for this requirement
+                normalized_data = None
+                for norm_r in normalized_results:
+                    if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
+                        normalized_data = norm_r
+                        break
+                
+                # Search in requirement text, source, normalized text, and categories
                 text_to_search = f"{r['Requirement']} {r['Source']}".lower()
+                if normalized_data:
+                    text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
+                
                 if all(term in text_to_search for term in search_terms):
                     filtered_requirement_rows.append(r)
+            
             requirement_rows = filtered_requirement_rows
             
             if not requirement_rows:
@@ -1030,10 +1079,26 @@ with tab_traceability:
         if search_traceability:
             search_terms = search_traceability.lower().split()
             filtered_requirement_rows = []
+            
+            # Get the original normalized data for more comprehensive search
+            normalized_results = get_normalized_requirements()
+            
             for r in requirement_rows:
+                # Find the corresponding normalized data for this requirement
+                normalized_data = None
+                for norm_r in normalized_results:
+                    if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
+                        normalized_data = norm_r
+                        break
+                
+                # Search in requirement text, source, normalized text, and categories
                 text_to_search = f"{r['Requirement']} {r['Source']}".lower()
+                if normalized_data:
+                    text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
+                
                 if all(term in text_to_search for term in search_terms):
                     filtered_requirement_rows.append(r)
+            
             requirement_rows = filtered_requirement_rows
             
             if not requirement_rows:
