@@ -723,7 +723,7 @@ with tab_search:
     st.markdown("""
         <div class="content-card" style="position: relative; z-index: 10;">
             <h3 style="margin-top: 0;">&#128172; Ask a Question</h3>
-            <p style="color: #64748b; margin-bottom: 1rem;">Ask anything about your requirements documents. I can help with analysis, dependencies, quality checks, and more.</p>
+            <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.775rem;">Ask anything about your requirements documents. I can help with analysis, dependencies, quality checks, and more.</p>
         </div>
         
         <script>
@@ -789,36 +789,102 @@ with tab_search:
                 st.session_state["last_query"] = query
 
             with st.container():
-                st.markdown("""
-                    <div class="content-card">
-                        <div class="section-header">
-                            <h3 style="margin: 0;">&#129001; Answer</h3>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
                 answer = st.session_state.get("answer", "No answer returned.")
                 if isinstance(answer, list):
+                    # Handle list answers
+                    answer_list = ""
                     for req in answer:
                         desc = req.get("description", "")
-                        st.markdown(f"- {desc}")
+                        answer_list += f"- {desc}<br>"
+                    
+                    st.markdown(f"""
+                        <div class="content-card" style="background-color: #f0fdf4; border-left: 4px solid #22c55e;">
+                            <h3 style="margin-top: 0; margin-bottom: 1rem;">&#129001; Answer</h3>
+                            <div style="font-size: 1rem; line-height: 1.5;">
+                                {answer_list}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Add CSS for consistent text sizing
+                    st.markdown("""
+                        <style>
+                        .content-card p, .content-card div, .content-card span, .content-card li, .content-card ul, .content-card ol {
+                            font-size: 1rem !important;
+                            line-height: 1.5 !important;
+                        }
+                        .content-card h1, .content-card h2, .content-card h4, .content-card h5, .content-card h6 {
+                            font-size: 1rem !important;
+                            font-weight: normal !important;
+                            margin: 0.5rem 0 !important;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
                         <div class="content-card" style="background-color: #f0fdf4; border-left: 4px solid #22c55e;">
-                            {answer}
+                            <h3 style="margin-top: 0; margin-bottom: 1rem;">&#129001; Answer</h3>
+                            <div style="font-size: 1rem; line-height: 1.5;">
+                                {answer}
+                            </div>
                         </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Add CSS for consistent text sizing
+                    st.markdown("""
+                        <style>
+                        .content-card p, .content-card div, .content-card span, .content-card li, .content-card ul, .content-card ol {
+                            font-size: 1rem !important;
+                            line-height: 1.5 !important;
+                        }
+                        .content-card h1, .content-card h2, .content-card h4, .content-card h5, .content-card h6 {
+                            font-size: 1rem !important;
+                            font-weight: normal !important;
+                            margin: 0.5rem 0 !important;
+                        }
+                        </style>
                     """, unsafe_allow_html=True)
 
             with st.container():
-                st.markdown("""
-                    <div class="content-card">
-                        <div class="section-header">
-                            <h3 style="margin: 0;">&#128196; Sources</h3>
-                        </div>
+                sources = st.session_state.get("sources", [])
+                unique_sources = []
+                seen = set()
+                for src in sources:
+                    if src not in seen:
+                        unique_sources.append(src)
+                        seen.add(src)
+                
+                # Create sources content
+                sources_content = ""
+                if len(unique_sources) > 3:
+                    sources_content = f"<p><strong>Sources ({len(unique_sources)} documents):</strong></p>"
+                    for src in unique_sources:
+                        if not src.startswith("data/"):
+                            sources_content += f"<p>• {src}</p>"
+                else:
+                    for src in unique_sources:
+                        if not src.startswith("data/"):
+                            sources_content += f"<p>• {src}</p>"
+                
+                st.markdown(f"""
+                    <div class="content-card" style="background-color: #f8fafc; border-left: 4px solid #64748b;">
+                        <h3 style="margin-top: 0; margin-bottom: 1rem;">&#128196; Sources</h3>
+                        {sources_content}
                     </div>
                 """, unsafe_allow_html=True)
-                sources = st.session_state.get("sources", [])
-                show_sources(sources)
+                
+                # Handle downloadable files separately if any exist
+                downloadable_sources = [src for src in unique_sources if src.startswith("data/") and os.path.exists(src)]
+                if downloadable_sources:
+                    for i, src in enumerate(downloadable_sources):
+                        with open(src, "rb") as f:
+                            st.download_button(
+                                label=f"Download {os.path.basename(src)}",
+                                data=f,
+                                file_name=os.path.basename(src),
+                                mime="application/octet-stream",
+                                key=f"download_{i}_{os.path.basename(src)}"
+                            )
         except Exception as e:
             st.error(f"An error occurred while processing your question: {e}")
             import traceback
