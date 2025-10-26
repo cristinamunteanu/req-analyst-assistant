@@ -122,8 +122,8 @@ def get_clarity_results():
 # Enhanced header section
 st.markdown("""
     <div class="content-card" style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
-        <h1 style="color: white; margin-bottom: 0.5rem; font-size: 2.5rem;">🔎 Requirements Analyst Assistant</h1>
-        <p style="font-size: 1.2rem; opacity: 0.9; margin-bottom: 0;">
+        <h1 style="color: white; margin-bottom: 0.5rem; font-size: 3rem;">🔎 Requirements Analyst Assistant</h1>
+        <p style="font-size: 1.4rem; opacity: 0.9; margin-bottom: 0;">
             AI-powered analysis for software requirements - clarity, quality, and compliance at scale
         </p>
     </div>
@@ -139,6 +139,16 @@ st.markdown("""
     .stApp {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         background-color: #fafbfc;
+    }
+    
+    /* Smooth scrolling for anchor links */
+    html {
+        scroll-behavior: smooth;
+    }
+    
+    /* Anchor target styling for better visibility */
+    div[id^="req-"] {
+        scroll-margin-top: 100px;
     }
     
     /* Main container styling */
@@ -183,9 +193,9 @@ st.markdown("""
     }
     
     [data-testid="stTabs"] button {
-        font-size: 1rem !important;
-        font-weight: 500 !important;
-        padding: 0.75rem 1.5rem !important;
+        font-size: 6rem !important;
+        font-weight: 600 !important;
+        padding: 2rem 3.5rem !important;
         border-radius: 8px !important;
         margin: 0 0.25rem !important;
         border: none !important;
@@ -237,22 +247,6 @@ st.markdown("""
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-    }
-    
-    /* Clear button specific styling */
-    [data-testid="column"]:nth-child(2) .stButton {
-        margin-top: -40px;
-    }
-    
-    [data-testid="column"]:nth-child(2) .stButton > button {
-        background: #ef4444 !important;
-        padding: 0.5rem !important;
-        font-size: 1rem !important;
-        min-height: 32px !important;
-    }
-    
-    [data-testid="column"]:nth-child(2) .stButton > button:hover {
-        background: #dc2626 !important;
     }
     
     /* Enhanced input styling */
@@ -419,6 +413,52 @@ st.markdown("""
             border-color: #334155;
         }
     }
+    
+    /* Make content text bigger for better readability */
+    .stApp p, .stApp li, .stApp span, .stApp div:not([data-testid="stTabs"]) {
+        font-size: 1.1rem !important;
+    }
+    
+    /* Keep specific elements at normal or larger size */
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
+        font-size: inherit !important;
+    }
+    
+    /* Sidebar text should be readable */
+    .stSidebar p, .stSidebar span, .stSidebar div {
+        font-size: 1rem !important;
+    }
+    
+    /* DataFrames should be readable */
+    .stDataFrame, .stDataFrame * {
+        font-size: 1rem !important;
+    }
+    
+    /* Override small text for important headers */
+    .content-card h1 {
+        font-size: 2.6rem !important;
+    }
+    
+    .content-card p {
+        font-size: 1.4rem !important;
+    }
+    
+    .sidebar-header h2 {
+        font-size: 1.6rem !important;
+    }
+    
+    .sidebar-header p {
+        font-size: 1.1rem !important;
+    }
+    
+    /* Make text inputs taller but keep Enter key behavior */
+    .stTextInput > div > div > input {
+        height: 2.8rem !important;
+        min-height: 2.8rem !important;
+        padding: 0.8rem 0.75rem !important;
+        font-size: 1.1rem !important;
+        line-height: 1.2 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -511,8 +551,8 @@ with st.sidebar:
     # Sidebar Header - simplified
     st.markdown("""
         <div class="sidebar-header">
-            <h2 style="margin: 0; font-size: 1.3rem;">&#128269; Search & Filter</h2>
-            <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 0.9rem;">
+            <h2 style="margin: 0; font-size: 1.6rem;">&#128269; Search & Filter</h2>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem;">
                 Find requirements across all tabs
             </p>
         </div>
@@ -647,16 +687,9 @@ def show_sources(sources):
                 st.write("•", src)
 
 with tab_search:
-    st.markdown("""
-        <div class="section-header">
-            <h2 style="margin: 0;">&#128269; Search</h2>
-        </div>
-    """, unsafe_allow_html=True)
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        llm_options = available_llm_providers()
-        if not llm_options:
-            st.warning("No LLM providers available. Please check your environment variables and dependencies.")
+    llm_options = available_llm_providers()
+    if not llm_options:
+        st.warning("No LLM providers available. Please check your environment variables and dependencies.")
 
     index = get_index()
     if index is None:
@@ -683,34 +716,59 @@ with tab_search:
         print("QA chain was not created. Please check your retriever and LLM setup.")
         st.stop()
 
-    # Enhanced search interface
+    # Search interface anchor
+    st.markdown('<div id="search-input-section"></div>', unsafe_allow_html=True)
+    
+    # Enhanced search interface with consolidated question section
     st.markdown("""
-        <div class="content-card">
+        <div class="content-card" style="position: relative; z-index: 10;">
             <h3 style="margin-top: 0;">&#128172; Ask a Question</h3>
             <p style="color: #64748b; margin-bottom: 1rem;">Ask anything about your requirements documents. I can help with analysis, dependencies, quality checks, and more.</p>
         </div>
+        
+        <script>
+            // Scroll to search input when Search tab is clicked
+            setTimeout(function() {
+                const searchSection = document.getElementById('search-input-section');
+                if (searchSection) {
+                    searchSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+        </script>
     """, unsafe_allow_html=True)
 
-    query = col1.text_input(
-        "Your question:", 
-        placeholder="e.g., What are the performance requirements? Which requirements have dependencies?",
-        label_visibility="collapsed"
-    )
-
-    # Example queries for better UX
-    if not query:
-        st.markdown("""
-            <div class="content-card" style="background-color: #eff6ff; border-left: 4px solid #3b82f6;">
-                <h4 style="margin-top: 0; color: #1e40af;">&#128161; Try asking:</h4>
-                <ul style="margin-bottom: 0;">
-                    <li>"What are all the performance requirements?"</li>
-                    <li>"Which requirements have unclear dependencies?"</li>
-                    <li>"Show me requirements that need clarification"</li>
-                    <li>"What are the functional vs non-functional requirements?"</li>
-                    <li>"Which requirements are related to offline capabilities?"</li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
+    # Column layout for text input and clear button
+    st.markdown("""
+        <style>
+        /* Align button text with text input text */
+        button[kind="secondary"] {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 38px !important;
+            padding: 0 12px !important;
+            line-height: 1 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        query = st.text_input(
+            "Your question:", 
+            placeholder="e.g., What are the performance requirements? Which requirements have dependencies?",
+            label_visibility="collapsed",
+            key="search_tab_query"
+        )
+    
+    with col2:
+        if st.button("🗑️ Clear", key="clear_search", help="Clear the search input"):
+            st.session_state.search_tab_query = ""
+            st.rerun()
+    
+    # Get the current query value
+    query = st.session_state.get("search_tab_query", "")
 
     if query and st.session_state.get("last_query") != query:
         st.session_state["should_update_answer"] = True
@@ -791,7 +849,7 @@ with tab_summaries:
             if filtered_results:
                 df = pd.DataFrame([
                     {
-                        "Source": r["source"],
+                        "Source": r["source"].replace("data/", "") if r["source"].startswith("data/") else r["source"],
                         "Requirement": r["text"],
                         "Normalized": r["normalized"],
                         "Categories": ", ".join(r["categories"]),
@@ -894,7 +952,7 @@ with tab_quality:
                     "Clarity": r["ClarityScore"],
                     "Requirement": r["Requirement"],
                     "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "—",
-                    "Source": r["Source"],
+                    "Source": r["Source"].replace("data/", "") if r["Source"].startswith("data/") else r["Source"],
                     "Details": (
                         f'<a href="#req-{abs(hash(r["Requirement"]))}">Details & Rewrite</a>'
                         if r["ClarityScore"] < 100 else ""
@@ -924,6 +982,10 @@ with tab_quality:
             limit = st.session_state["details_limit"]
 
             for idx, r in enumerate(filtered[:limit]):
+                # Create anchor target for the table links
+                anchor_id = f"req-{abs(hash(r['Requirement']))}"
+                st.markdown(f'<div id="{anchor_id}"></div>', unsafe_allow_html=True)
+                
                 show_details_key = f"show_details_{idx}_{hash(r['Requirement'])}"
                 details_state_key = f"{show_details_key}_state"
                 rewrite_btn_key = f"rewrite_btn_{idx}_{hash(r['Requirement'])}"
