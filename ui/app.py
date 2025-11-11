@@ -551,15 +551,15 @@ with st.sidebar:
     # Sidebar Header - simplified
     st.markdown("""
         <div class="sidebar-header">
-            <h2 style="margin: 0; font-size: 1.6rem;">&#128269; Search & Filter</h2>
+            <h2 style="margin: 0; font-size: 1.6rem;">&#128269; Filter Requirements</h2>
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem;">
-                Find requirements across all tabs
+                Filter and search requirements across all tabs
             </p>
         </div>
     """, unsafe_allow_html=True)
     
     # Search input section
-    st.markdown("**Enter keywords to search:**")
+    st.markdown("**Enter keywords to filter requirements:**")
     
     # Search input with enhanced styling
     col1, col2 = st.columns([3.5, 1])
@@ -569,14 +569,14 @@ with st.sidebar:
     
     with col1:
         search_query = st.text_input(
-            "Search all requirements:",
+            "Filter all requirements:",
             placeholder="e.g., performance, security, user...",
             key=f"unified_search_{search_instance}",
             label_visibility="collapsed",
             help="Enter keywords to filter requirements across all tabs"
         )
     with col2:
-        if st.button("🗑️", key="clear_unified_search", help="Clear search"):
+        if st.button("🗑️", key="clear_unified_search", help="Clear filter"):
             # Increment search instance to create a new text input widget
             st.session_state['search_instance'] = st.session_state.get('search_instance', 0) + 1
             # Clear any old search states
@@ -740,8 +740,40 @@ with tab_search:
     # Column layout for text input and clear button
     st.markdown("""
         <style>
+        /* Make Ask a Question header and description slightly smaller for better balance */
+        .content-card h3 {
+            font-size: 1.5rem !important;
+            margin-top: 0;
+            margin-bottom: 0.2rem;
+            font-weight: 600;
+        }
+        .content-card p {
+            font-size: 1.1rem !important;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Reduce input/textarea font size in the search area */
+        .stTextInput>div>div>input,
+        .stTextArea>div>div>textarea,
+        input[type="text"],
+        textarea {
+            font-size: 1.25rem !important;
+            padding: 12px 16px !important;
+        }
+
         /* Align button text with text input text */
         button[kind="secondary"] {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 38px !important;
+            padding: 0 12px !important;
+            line-height: 1 !important;
+        }
+        
+        /* Align primary button with text input */
+        button[kind="primary"] {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -763,8 +795,16 @@ with tab_search:
         )
     
     with col2:
-        if st.button("🗑️ Clear", key="clear_search", help="Clear the search input"):
-            st.session_state.search_tab_query = ""
+        if st.button("🗑️ Clear", key="clear_search", help="Clear the search input", type="primary"):
+            # Increment counter to create new text input with empty value
+            st.session_state.clear_counter += 1
+            # Clear any stored answers
+            if "answer" in st.session_state:
+                del st.session_state["answer"]
+            if "sources" in st.session_state:
+                del st.session_state["sources"]
+            if "last_query" in st.session_state:
+                del st.session_state["last_query"]
             st.rerun()
     
     # Get the current query value
@@ -893,11 +933,6 @@ with tab_search:
             st.text(tb)
 
 with tab_summaries:
-    st.markdown("""
-        <div class="section-header">
-            <h2 style="margin: 0;">&#128203; Requirement Normalization & Categorization</h2>
-        </div>
-    """, unsafe_allow_html=True)
     
     try:
         results = get_normalized_requirements()
@@ -915,10 +950,10 @@ with tab_summaries:
             if filtered_results:
                 df = pd.DataFrame([
                     {
-                        "Source": r["source"].replace("data/", "") if r["source"].startswith("data/") else r["source"],
+                        "Source document": r["source"].replace("data/", "") if r["source"].startswith("data/") else r["source"],
                         "Requirement": r["text"],
-                        "Normalized": r["normalized"],
-                        "Categories": ", ".join(r["categories"]),
+                        "Summary": r["normalized"],
+                        "Type": ", ".join(r["categories"]),
                     }
                     for r in filtered_results
                 ])
@@ -927,7 +962,51 @@ with tab_summaries:
                 if search_summaries:
                     st.info(f"Found {len(filtered_results)} requirement(s) matching '{search_summaries}'")
                 
-                st.dataframe(df, use_container_width=True)
+                # Display table with centered headers using HTML
+                st.markdown("""
+                    <style>
+                    .summaries-table-container {
+                        width: 100%;
+                        overflow-x: auto;
+                        overflow-y: auto;
+                        max-height: 600px;
+                        border: 1px solid #dee2e6;
+                        border-radius: 8px;
+                        margin: 1rem 0;
+                    }
+                    .summaries-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 0;
+                    }
+                    .summaries-table th {
+                        background-color: #f8f9fa;
+                        border: 1px solid #dee2e6;
+                        padding: 12px;
+                        text-align: center !important;
+                        font-weight: 600;
+                        color: #495057;
+                        position: sticky;
+                        top: 0;
+                        z-index: 10;
+                    }
+                    .summaries-table td {
+                        border: 1px solid #dee2e6;
+                        padding: 12px;
+                        vertical-align: top;
+                    }
+                    .summaries-table tr:nth-child(even) {
+                        background-color: #f8f9fa;
+                    }
+                    .summaries-table tr:hover {
+                        background-color: #e9ecef;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+                
+                # Convert to HTML table with scrollable container
+                html_table = df.to_html(classes='summaries-table', escape=False, index=False)
+                st.markdown(f'<div class="summaries-table-container">{html_table}</div>', unsafe_allow_html=True)
                 for r in filtered_results:
                     if DEBUG:
                         print("NORMALIZED FIELD:", repr(r["normalized"]))
@@ -943,6 +1022,9 @@ with tab_summaries:
         st.error(f"Failed to process requirements: {e}")
 
 with tab_quality:
+    # Add anchor for back to top functionality
+    st.markdown('<div id="quality-top"></div>', unsafe_allow_html=True)
+    
     st.markdown("""
         <div class="section-header">
             <h2 style="margin: 0;">&#129529; Clarity & Ambiguity Checks</h2>
@@ -991,11 +1073,11 @@ with tab_quality:
         missing_refs, circular_refs = analyze_dependencies(requirement_rows)
 
         # Create sub-tabs for the Quality tab
-        subtab_table, subtab_details, subtab_dependency = st.tabs(
-            ["Table View", "Details & Suggested Rewrites", "Dependency & Consistency Check"]
+        subtab_analysis, subtab_dependency = st.tabs(
+            ["Table View & Details", "Dependency & Consistency Check"]
         )
 
-        with subtab_table:
+        with subtab_analysis:
             st.caption("Filters")
             colA, colB, colC, colD = st.columns(4)
             f_amb = colA.toggle("Ambiguous", value=True)
@@ -1013,19 +1095,22 @@ with tab_quality:
 
             filtered = [r for r in requirement_rows if pass_filters(r["Issues"])]
 
+            # Sort filtered requirements by clarity score (lowest first) then alphabetically
+            filtered_sorted = sorted(filtered, key=lambda x: (x["ClarityScore"], x["Requirement"]))
+            
             df = pd.DataFrame([
                 {
-                    "Clarity": r["ClarityScore"],
-                    "Requirement": r["Requirement"],
-                    "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "—",
-                    "Source": r["Source"].replace("data/", "") if r["Source"].startswith("data/") else r["Source"],
-                    "Details": (
-                        f'<a href="#req-{abs(hash(r["Requirement"]))}">Details & Rewrite</a>'
-                        if r["ClarityScore"] < 100 else ""
+                    "Clarity": (
+                        f'<a href="#req-{abs(hash(r["Requirement"]))}" style="text-decoration: none; color: #dc2626; font-weight: bold;">{r["ClarityScore"]}</a>'
+                        if r["ClarityScore"] < 100 
+                        else f'<span style="color: #059669; font-weight: bold;">{r["ClarityScore"]}</span>'
                     ),
+                    "Requirement": r["Requirement"],
+                    "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "",
+                    "Source": r["Source"].replace("data/", "") if r["Source"].startswith("data/") else r["Source"],
                 }
-                for r in filtered
-            ]).sort_values(by=["Clarity", "Issues"], ascending=[True, True])
+                for r in filtered_sorted
+            ])
 
             # Reduced heading size and consistent capitalization
             st.markdown(
@@ -1033,21 +1118,40 @@ with tab_quality:
                 <div style="background: #f7f7f9; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); padding: 1.5em 1em 1em 1em; margin-bottom: 1em;">
                     {df.to_html(escape=False, index=False)}
                 </div>
+                <style>
+                /* Center table headers */
+                table.dataframe thead th {{
+                    text-align: center !important;
+                }}
+                </style>
                 """,
                 unsafe_allow_html=True
             )
-
-        with subtab_details:
+            
             st.divider()
+
+            # Details & Suggested Rewrites Section (now in same tab)
             st.markdown("### Details & Suggested Rewrites")
 
-            PAGE_SIZE = 5
-            if "details_limit" not in st.session_state:
-                st.session_state["details_limit"] = PAGE_SIZE
+            # Ensure Show details button text is visible (white) across themes
+            st.markdown('''
+                <style>
+                /* Target the Show details button more specifically */
+                button:has-text("🔍 Show details"), 
+                button[kind="secondary"]:contains("Show details"),
+                .stButton > button:contains("🔍 Show details"),
+                div[data-testid="stButton"] button:contains("Show details") {
+                    color: #ffffff !important;
+                }
+                /* More aggressive targeting for all secondary buttons with magnifying glass */
+                button[kind="secondary"] {
+                    color: #ffffff !important;
+                }
+                </style>
+            ''', unsafe_allow_html=True)
 
-            limit = st.session_state["details_limit"]
-
-            for idx, r in enumerate(filtered[:limit]):
+            # Show all filtered requirements by default
+            for idx, r in enumerate(filtered_sorted):
                 # Create anchor target for the table links
                 anchor_id = f"req-{abs(hash(r['Requirement']))}"
                 st.markdown(f'<div id="{anchor_id}"></div>', unsafe_allow_html=True)
@@ -1097,24 +1201,101 @@ with tab_quality:
                                 st.markdown("#### ✏️ <span style='color:#0072B2'>Rewrite</span>", unsafe_allow_html=True)
                                 st.info(st.session_state[rewrite_state_key])
 
-            # Place the button AFTER the requirements list
-            if limit < len(filtered):
-                if st.button("Show more requirements", key=f"show_more_requirements_{limit}"):
-                    st.session_state["details_limit"] += PAGE_SIZE
-                    st.rerun()  # Ensures immediate update after button press
+            # Back to top button
+            st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+            st.markdown("""
+                <a href="#quality-top" style="
+                    display: inline-block;
+                    background-color: #ffffff;
+                    border: 1px solid #cccccc;
+                    color: #262730;
+                    padding: 0.5rem 1rem;
+                    text-decoration: none;
+                    border-radius: 0.5rem;
+                    font-size: 1rem;
+                    font-weight: 400;
+                    line-height: 1.6;
+                    cursor: pointer;
+                    transition: all 0.15s ease-in-out;
+                    min-height: 2.5rem;
+                    min-width: 180px;
+                    box-sizing: border-box;
+                    text-align: center;
+                    vertical-align: middle;
+                    white-space: nowrap;
+                " onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#cccccc'; this.style.color='#262730'">
+                    ⬆️ Back to top
+                </a>
+            """, unsafe_allow_html=True)
 
         with subtab_dependency:
-            st.divider()
-            st.markdown("## 🔗 Dependency & Consistency Check")
+
             if missing_refs:
-                st.warning(f"Referenced but missing requirement IDs: {', '.join(sorted(missing_refs))}")
+                st.markdown(f"""
+                    <div class="content-card" style="background-color: #fef3cd; border-left: 4px solid #f59e0b; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem; color: #f59e0b;">⚠️</span>
+                            <div>
+                                <h5 style="margin: 0 0 0.5rem 0; color: #92400e;">Missing References Found</h5>
+                                <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
+                                    The following requirement IDs are referenced but do not exist in the current dataset:
+                                </p>
+                                <ul style="margin: 0.5rem 0 0 0; color: #92400e;">
+                                    {''.join([f'<li><code>{ref}</code></li>' for ref in sorted(missing_refs)])}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
             else:
-                st.success("No missing requirement references detected.")
+                st.markdown("""
+                    <div class="content-card" style="background-color: #d1fae5; border-left: 4px solid #10b981;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem; color: #10b981;">✅</span>
+                            <div>
+                                <h5 style="margin: 0; color: #065f46;">All References Valid</h5>
+                                <p style="margin: 0; color: #065f46; font-size: 0.9rem;">
+                                    No missing requirement references detected in the current dataset.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
 
             if circular_refs:
-                st.error(f"Circular references detected: {', '.join([f'{a} ↔ {b}' for a, b in circular_refs])}")
+                st.markdown(f"""
+                    <div class="content-card" style="background-color: #fee2e2; border-left: 4px solid #ef4444; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem; color: #ef4444;">🚨</span>
+                            <div>
+                                <h5 style="margin: 0 0 0.5rem 0; color: #dc2626;">Circular Dependencies Detected</h5>
+                                <p style="margin: 0 0 0.75rem 0; color: #dc2626; font-size: 0.9rem;">
+                                    The following circular reference patterns were found:
+                                </p>
+                                <div style="background-color: #fef2f2; padding: 0.75rem; border-radius: 0.375rem; border: 1px solid #fecaca;">
+                                    {''.join([f'<div style="color: #dc2626; font-family: monospace; margin: 0.25rem 0;"><strong>{a}</strong> ↔ <strong>{b}</strong></div>' for a, b in circular_refs])}
+                                </div>
+                                <p style="margin: 0.75rem 0 0 0; color: #dc2626; font-size: 0.85rem; font-style: italic;">
+                                    💡 Tip: Review these requirements to break the circular dependency chain.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
             else:
-                st.success("No circular references detected.")
+                st.markdown("""
+                    <div class="content-card" style="background-color: #d1fae5; border-left: 4px solid #10b981;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem; color: #10b981;">✅</span>
+                            <div>
+                                <h5 style="margin: 0; color: #065f46;">No Circular Dependencies</h5>
+                                <p style="margin: 0; color: #065f46; font-size: 0.9rem;">
+                                    No circular reference patterns detected. Dependency structure is clean.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
