@@ -1,0 +1,407 @@
+/* Import Google Fonts for better typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Global styling improvements */
+.stApp {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background-color: #fafbfc;
+}
+
+/* Smooth scrolling for anchor links */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Anchor target styling for better visibility */
+div[id^="req-"] {
+    scroll-margin-top: 100px;
+}
+
+/* Main container styling */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
+}
+
+/* Header styling */
+h1 {
+    color: #1e293b;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 0.5rem;
+}
+
+h2 {
+    color: #334155;
+    font-weight: 600;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+h3 {
+    color: #475569;
+    font-weight: 500;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Enhanced tab styling */
+[data-testid="stTabs"] {
+    background-color: white;
+    padding: 0.5rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    border: 1px solid #e2e8f0;
+}
+
+[data-testid="stTabs"] button {
+    font-size: 6rem !important;
+    font-weight: 600 !important;
+    padding: 2rem 3.5rem !important;
+    border-radius: 8px !important;
+    margin: 0 0.25rem !important;
+    border: none !important;
+    background-color: transparent !important;
+    color: #64748b !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stTabs"] button:hover {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+}
+
+[data-testid="stTabs"] button[aria-selected="true"] {
+    background-color: #3b82f6 !important;
+    color: white !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Sidebar improvements */
+.stSidebar {
+    background-color: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+}
+
+.stSidebar .stSelectbox, .stSidebar .stSlider {
+    background-color: white;
+    border-radius: 8px;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1rem;
+}
+
+/* Enhanced button styling */
+.stButton > button {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+/* Enhanced input styling */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+    background-color: white;
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Enhanced dataframe styling */
+.stDataFrame {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Info/warning/error message improvements */
+.stAlert {
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stAlert[data-baseweb="notification"] {
+    padding: 1rem 1.5rem;
+}
+
+/* Success messages */
+.stSuccess {
+    background-color: #dbeafe;
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+}
+
+/* Warning messages */
+.stWarning {
+    background-color: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+}
+
+/* Error messages */
+.stError {
+    background-color: #fef2f2;
+    border-left: 4px solid #ef4444;
+    color: #dc2626;
+}
+
+/* Info messages */
+.stInfo {
+    background-color: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+}
+
+/* Enhanced metric styling */
+[data-testid="metric-container"] {
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+[data-testid="metric-container"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced expander styling */
+.streamlit-expanderHeader {
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.streamlit-expanderContent {
+    background-color: #f9fafb;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 1.5rem;
+}
+
+/* Enhanced code block styling */
+.stCodeBlock {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background-color: #1e293b;
+}
+
+pre {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* Loading spinner improvements */
+.stSpinner {
+    color: #3b82f6;
+}
+
+/* Column spacing improvements */
+.row-widget {
+    margin-bottom: 1rem;
+}
+
+/* Custom card styling for content sections */
+.content-card {
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved spacing for sections */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .stApp {
+        background-color: #0f172a;
+    }
+    
+    .content-card {
+        background-color: #1e293b;
+        border-color: #334155;
+    }
+    
+    h1, h2, h3 {
+        color: #f1f5f9;
+    }
+    
+    [data-testid="stTabs"] {
+        background-color: #1e293b;
+        border-color: #334155;
+    }
+}
+
+/* Make content text bigger for better readability */
+.stApp p, .stApp li, .stApp span, .stApp div:not([data-testid="stTabs"]) {
+    font-size: 1.1rem !important;
+}
+
+/* Keep specific elements at normal or larger size */
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
+    font-size: inherit !important;
+}
+
+/* Sidebar text should be readable */
+.stSidebar p, .stSidebar span, .stSidebar div {
+    font-size: 1rem !important;
+}
+
+/* DataFrames should be readable */
+.stDataFrame, .stDataFrame * {
+    font-size: 1rem !important;
+}
+
+/* Override small text for important headers */
+.content-card h1 {
+    font-size: 2.6rem !important;
+}
+
+.content-card p {
+    font-size: 1.4rem !important;
+}
+
+.sidebar-header h2 {
+    font-size: 1.6rem !important;
+}
+
+.sidebar-header p {
+    font-size: 1.1rem !important;
+}
+
+/* Make text inputs taller but keep Enter key behavior */
+.stTextInput > div > div > input {
+    height: 2.8rem !important;
+    min-height: 2.8rem !important;
+    padding: 0.8rem 0.75rem !important;
+    font-size: 1.1rem !important;
+    line-height: 1.2 !important;
+}
+
+/* Sidebar-specific enhancements */
+.stSidebar {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.sidebar-header {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 10px;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1);
+}
+
+.sidebar-section {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-section h3 {
+    color: #1e293b;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.search-stats {
+    background: #eff6ff;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.sidebar-button {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.clear-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
+
+.clear-btn:hover {
+    background: #dc2626;
+}

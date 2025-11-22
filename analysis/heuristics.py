@@ -62,7 +62,20 @@ def _find_vague(text: str) -> List[Issue]:
     Returns:
         List[Issue]: List of ambiguous issues found.
     """
-    vague_terms = {"some", "various", "appropriate", "etc", "possibly", "may", "might"}
+    vague_terms = {
+        # Original terms
+        "some", "various", "appropriate", "etc", "possibly", "may", "might",
+        # Quality/performance adjectives without metrics
+        "robust", "strong", "secure", "efficient", "reliable", "suitable", 
+        "adequate", "sufficient", "optimal", "good", "better", "best",
+        "high", "low", "small", "large", "significant", "reasonable",
+        # Process/implementation vagueness  
+        "proper", "correct", "normal", "standard", "typical", "usual",
+        "effective", "successful", "improved", "enhanced", "advanced",
+        # Scope/boundary vagueness
+        "relevant", "necessary", "required", "important", "critical",
+        "essential", "key", "main", "primary", "basic", "simple"
+    }
     return _find_terms(text, vague_terms, "Ambiguous", "Ambiguous/vague term")
 
 def _find_nonverifiable(text: str) -> List[Issue]:
@@ -89,10 +102,43 @@ def _find_passive(text: str) -> List[Issue]:
             issues.append(Issue("PassiveVoice", text[start:end], "Use active voice with clear actor"))
     return issues
 
+def _find_security_vagueness(text: str) -> List[Issue]:
+    """
+    Finds security-specific vague terms that lack technical specificity.
+    Returns:
+        List[Issue]: List of security vagueness issues found.
+    """
+    issues = []
+    t = text.lower()
+    
+    # Security terms that need specification
+    security_patterns = {
+        r'\bencryption\b(?!\s+(?:aes|rsa|3des|des|blowfish|twofish|chacha|salsa))': 
+            "Specify encryption algorithm (e.g., AES-256, RSA-2048)",
+        r'\bhash\b(?!\s+(?:sha|md5|blake|argon|scrypt|pbkdf))': 
+            "Specify hash algorithm (e.g., SHA-256, BLAKE2b)",
+        r'\bauthentication\b(?!\s+(?:oauth|saml|jwt|kerberos|ldap|2fa|mfa))': 
+            "Specify authentication method (e.g., OAuth 2.0, SAML, MFA)",
+        r'\bssl\b(?!\s+(?:tls|1\.2|1\.3))': 
+            "Specify TLS version (e.g., TLS 1.2, TLS 1.3)",
+        r'\bsecurity\s+(?:protocol|standard|framework)\b(?!\s+(?:iso|nist|fips|common\s+criteria))': 
+            "Specify security standard (e.g., NIST, FIPS 140-2, ISO 27001)"
+    }
+    
+    for pattern, suggestion in security_patterns.items():
+        matches = re.finditer(pattern, t)
+        for m in matches:
+            start = max(0, m.start() - 20)
+            end = min(len(text), m.end() + 20)
+            issues.append(Issue("NonVerifiable", text[start:end], suggestion))
+    
+    return issues
+
 def analyze_clarity(text: str) -> Dict[str, Any]:
     """
     Analyzes the clarity of a requirement text using several heuristics.
-    Finds issues such as TBD markers, vague terms, non-verifiable quantifiers, and passive voice.
+    Finds issues such as TBD markers, vague terms, non-verifiable quantifiers, 
+    passive voice, and security-specific vagueness.
     Returns a list of issues and a clarity score (0-100).
     Args:
         text (str): The requirement text to analyze.
@@ -107,6 +153,7 @@ def analyze_clarity(text: str) -> Dict[str, Any]:
     found += _find_vague(text)
     found += _find_nonverifiable(text)
     found += _find_passive(text)
+    found += _find_security_vagueness(text)
 
     # Scoring (start at 100; subtract weighted penalties)
     score = 100

@@ -108,42 +108,105 @@ def _functional_templates(text: str) -> List[Dict[str, Any]]:
     ]
 
 def _performance_templates(text: str) -> List[Dict[str, Any]]:
+    t = text.lower()
     metrics = _extract_metrics(text)
-    pretty = ", ".join([f"{op or ''} {num} {unit}".strip() for op, num, unit in metrics]) if metrics else "<target>"
+
+    # Detect uptime / availability style requirements
+    has_uptime = "uptime" in t or "availability" in t
+    percent_metrics = [(op, num, unit) for op, num, unit in metrics if unit == "%"]
+
+    if has_uptime and percent_metrics:
+        # Use the first percentage metric, ignore the operator in wording
+        _, num, unit = percent_metrics[0]
+        threshold = f"{num}{unit}"
+
+        return [
+            {
+                "title": "Monthly uptime SLO",
+                "steps": [
+                    "Given production monitoring and logging are enabled with a defined uptime SLO",
+                    "When uptime is calculated over a full calendar month (excluding approved maintenance windows)",
+                    "Then the measured uptime meets or exceeds the agreed threshold"
+                ],
+                "acceptance": [
+                    f"Measured monthly uptime is at least {threshold} over the last full month, excluding approved maintenance windows."
+                ],
+            },
+            {
+                "title": "Outage budget / downtime limit",
+                "steps": [
+                    "Given an agreed error budget derived from the uptime target",
+                    "When all outages for a calendar month are summed",
+                    "Then total unplanned downtime does not exceed the allowed error budget"
+                ],
+                "acceptance": [
+                    f"Total unplanned downtime per calendar month is within the limit implied by {threshold} uptime."
+                ],
+            },
+            {
+                "title": "Failure and recovery monitoring",
+                "steps": [
+                    "Given a simulated set of service failures during the month",
+                    "When the monitoring and alerting system records incidents",
+                    "Then each outage is detected, alerted, and included in uptime calculations"
+                ],
+                "acceptance": [
+                    "All outages are recorded with timestamps; calculated uptime from monitoring matches the SLO report within an agreed tolerance."
+                ],
+            },
+        ]
+
+    # ---- Default performance templates (latency / throughput etc.) ----
+    # Only consider latency-like metrics for pretty printing (ms / seconds)
+    latency_metrics = [
+        (op, num, unit)
+        for op, num, unit in metrics
+        if unit.lower() in ("ms", "s", "sec", "seconds")
+    ]
+    pretty = (
+        ", ".join(
+            [f"{num} {unit}" for op, num, unit in latency_metrics]
+        )
+        if latency_metrics
+        else "<target>"
+    )
+
     return [
         {
             "title": "Latency / response-time budget",
             "steps": [
                 "Given a reference device/test rig",
                 "When the operation is triggered 50–100 times under nominal load",
-                "Then measured latency meets or outperforms the threshold"
+                "Then measured latency meets or outperforms the threshold",
             ],
             "acceptance": [
-                f"p95 latency ≤ {pretty} under nominal load" if metrics else "p95 latency meets the specified target under nominal load"
-            ]
+                f"p95 latency ≤ {pretty} under nominal load"
+                if latency_metrics
+                else "p95 latency meets the specified target under nominal load"
+            ],
         },
         {
             "title": "Cold/warm start performance",
             "steps": [
                 "Given the app/service is cold-started",
                 "When the first actionable screen or instruction is requested",
-                "Then time-to-first-instruction meets target"
+                "Then time-to-first-instruction meets target",
             ],
             "acceptance": [
                 "Time-to-first-instruction ≤ target on the reference device (specify device/OS)."
-            ]
+            ],
         },
         {
             "title": "Sustained throughput / stability",
             "steps": [
                 "Given sustained activity for N minutes",
                 "When operations are executed continuously",
-                "Then throughput and error rate stay within bounds"
+                "Then throughput and error rate stay within bounds",
             ],
             "acceptance": [
                 "Throughput ≥ target; error rate ≤ target; no memory leaks or crashes observed."
-            ]
-        }
+            ],
+        },
     ]
 
 def _ux_templates(text: str) -> List[Dict[str, Any]]:

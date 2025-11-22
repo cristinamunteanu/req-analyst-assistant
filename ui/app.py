@@ -27,6 +27,18 @@ from analysis.traceability import build_trace_matrix, export_trace_matrix_csv
 
 DEBUG = True  # Set to False to disable debug prints
 
+def load_css(file_path: str) -> str:
+    """Load CSS content from external file."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        st.error(f"CSS file not found: {file_path}")
+        return ""
+    except Exception as e:
+        st.error(f"Error loading CSS: {e}")
+        return ""
+
 def log(msg: str):
     """Simple logging helper used across the UI.
 
@@ -42,7 +54,7 @@ def log(msg: str):
         # Last-resort fallback: ignore logging errors
         pass
 
-st.set_page_config(page_title="Requirements Analyst Assistant", page_icon="🔎", layout="wide")
+st.set_page_config(page_title="Requirements Analyst Assistant", page_icon=None, layout="wide")
 
 load_dotenv()
 
@@ -122,7 +134,7 @@ def get_clarity_results():
 # Enhanced header section
 st.markdown("""
     <div class="content-card" style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
-        <h1 style="color: white; margin-bottom: 0.5rem; font-size: 3rem;">🔎 Requirements Analyst Assistant</h1>
+        <h1 style="color: white; margin-bottom: 0.5rem; font-size: 3rem;">Requirements Analyst Assistant</h1>
         <p style="font-size: 1.4rem; opacity: 0.9; margin-bottom: 0;">
             AI-powered analysis for software requirements - clarity, quality, and compliance at scale
         </p>
@@ -130,428 +142,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div id="top"></div>', unsafe_allow_html=True)
-st.markdown("""
-    <style>
-    /* Import Google Fonts for better typography */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
-    /* Global styling improvements */
-    .stApp {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        background-color: #fafbfc;
-    }
-    
-    /* Smooth scrolling for anchor links */
-    html {
-        scroll-behavior: smooth;
-    }
-    
-    /* Anchor target styling for better visibility */
-    div[id^="req-"] {
-        scroll-margin-top: 100px;
-    }
-    
-    /* Main container styling */
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        max-width: 1200px;
-    }
-    
-    /* Header styling */
-    h1 {
-        color: #1e293b;
-        font-weight: 700;
-        letter-spacing: -0.025em;
-        margin-bottom: 0.5rem;
-    }
-    
-    h2 {
-        color: #334155;
-        font-weight: 600;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 0.5rem;
-        margin-top: 2rem;
-        margin-bottom: 1.5rem;
-    }
-    
-    h3 {
-        color: #475569;
-        font-weight: 500;
-        margin-top: 1.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    /* Enhanced tab styling */
-    [data-testid="stTabs"] {
-        background-color: white;
-        padding: 0.5rem;
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
-        border: 1px solid #e2e8f0;
-    }
-    
-    [data-testid="stTabs"] button {
-        font-size: 6rem !important;
-        font-weight: 600 !important;
-        padding: 2rem 3.5rem !important;
-        border-radius: 8px !important;
-        margin: 0 0.25rem !important;
-        border: none !important;
-        background-color: transparent !important;
-        color: #64748b !important;
-        transition: all 0.2s ease !important;
-    }
-    
-    [data-testid="stTabs"] button:hover {
-        background-color: #f1f5f9 !important;
-        color: #475569 !important;
-    }
-    
-    [data-testid="stTabs"] button[aria-selected="true"] {
-        background-color: #3b82f6 !important;
-        color: white !important;
-        font-weight: 600 !important;
-        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
-    }
-    
-    /* Sidebar improvements */
-    .stSidebar {
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-    }
-    
-    .stSidebar .stSelectbox, .stSidebar .stSlider {
-        background-color: white;
-        border-radius: 8px;
-        padding: 0.5rem;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 1rem;
-    }
-    
-    /* Enhanced button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 500;
-        font-size: 1rem;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-    }
-    
-    /* Enhanced input styling */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        border: 2px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.75rem;
-        font-size: 1rem;
-        transition: border-color 0.2s ease;
-        background-color: white;
-    }
-    
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-    
-    /* Enhanced dataframe styling */
-    .stDataFrame {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Info/warning/error message improvements */
-    .stAlert {
-        border-radius: 8px;
-        border: none;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    
-    .stAlert[data-baseweb="notification"] {
-        padding: 1rem 1.5rem;
-    }
-    
-    /* Success messages */
-    .stSuccess {
-        background-color: #f0fdf4;
-        border-left: 4px solid #22c55e;
-        color: #166534;
-    }
-    
-    /* Warning messages */
-    .stWarning {
-        background-color: #fffbeb;
-        border-left: 4px solid #f59e0b;
-        color: #92400e;
-    }
-    
-    /* Error messages */
-    .stError {
-        background-color: #fef2f2;
-        border-left: 4px solid #ef4444;
-        color: #dc2626;
-    }
-    
-    /* Info messages */
-    .stInfo {
-        background-color: #eff6ff;
-        border-left: 4px solid #3b82f6;
-        color: #1e40af;
-    }
-    
-    /* Enhanced metric styling */
-    [data-testid="metric-container"] {
-        background-color: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease;
-    }
-    
-    [data-testid="metric-container"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    
-    /* Enhanced expander styling */
-    .streamlit-expanderHeader {
-        background-color: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
-        font-weight: 500;
-        color: #374151;
-    }
-    
-    .streamlit-expanderContent {
-        background-color: #f9fafb;
-        border: 1px solid #e2e8f0;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        padding: 1.5rem;
-    }
-    
-    /* Enhanced code block styling */
-    .stCodeBlock {
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        background-color: #1e293b;
-    }
-    
-    pre {
-        white-space: pre-wrap !important;
-        word-break: break-word !important;
-        background-color: #1e293b;
-        color: #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
-        font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-    }
-    
-    /* Loading spinner improvements */
-    .stSpinner {
-        color: #3b82f6;
-    }
-    
-    /* Column spacing improvements */
-    .row-widget {
-        margin-bottom: 1rem;
-    }
-    
-    /* Custom card styling for content sections */
-    .content-card {
-        background-color: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Improved spacing for sections */
-    .section-header {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-        .stApp {
-            background-color: #0f172a;
-        }
-        
-        .content-card {
-            background-color: #1e293b;
-            border-color: #334155;
-        }
-        
-        h1, h2, h3 {
-            color: #f1f5f9;
-        }
-        
-        [data-testid="stTabs"] {
-            background-color: #1e293b;
-            border-color: #334155;
-        }
-    }
-    
-    /* Make content text bigger for better readability */
-    .stApp p, .stApp li, .stApp span, .stApp div:not([data-testid="stTabs"]) {
-        font-size: 1.1rem !important;
-    }
-    
-    /* Keep specific elements at normal or larger size */
-    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
-        font-size: inherit !important;
-    }
-    
-    /* Sidebar text should be readable */
-    .stSidebar p, .stSidebar span, .stSidebar div {
-        font-size: 1rem !important;
-    }
-    
-    /* DataFrames should be readable */
-    .stDataFrame, .stDataFrame * {
-        font-size: 1rem !important;
-    }
-    
-    /* Override small text for important headers */
-    .content-card h1 {
-        font-size: 2.6rem !important;
-    }
-    
-    .content-card p {
-        font-size: 1.4rem !important;
-    }
-    
-    .sidebar-header h2 {
-        font-size: 1.6rem !important;
-    }
-    
-    .sidebar-header p {
-        font-size: 1.1rem !important;
-    }
-    
-    /* Make text inputs taller but keep Enter key behavior */
-    .stTextInput > div > div > input {
-        height: 2.8rem !important;
-        min-height: 2.8rem !important;
-        padding: 0.8rem 0.75rem !important;
-        font-size: 1.1rem !important;
-        line-height: 1.2 !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+
+# Load external CSS
+css_content = load_css('ui/styles.css')
+if css_content:
+    st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
 with st.sidebar:
-    # Enhanced sidebar styling
-    st.markdown("""
-        <style>
-        /* Sidebar-specific enhancements */
-        .stSidebar {
-            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-        }
-        
-        .sidebar-header {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            padding: 1rem;
-            border-radius: 10px;
-            text-align: center;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1);
-        }
-        
-        .sidebar-section {
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-        
-        .sidebar-section h3 {
-            color: #1e293b;
-            margin-top: 0;
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .search-stats {
-            background: #eff6ff;
-            border: 1px solid #3b82f6;
-            border-radius: 6px;
-            padding: 0.75rem;
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-        
-        .sidebar-button {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 0.75rem 1rem;
-            font-size: 0.9rem;
-            cursor: pointer;
-            width: 100%;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-            margin-bottom: 0.5rem;
-        }
-        
-        .sidebar-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
-        }
-        
-        .clear-btn {
-            background: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 0.5rem;
-            font-size: 0.8rem;
-            cursor: pointer;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .clear-btn:hover {
-            background: #dc2626;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
     # Sidebar Header - simplified
     st.markdown("""
         <div class="sidebar-header">
-            <h2 style="margin: 0; font-size: 1.6rem;">&#128269; Filter Requirements</h2>
+            <h2 style="margin: 0; font-size: 1.6rem;">Filter Requirements</h2>
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem;">
                 Filter and search requirements across all tabs
             </p>
@@ -595,8 +196,8 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
-            <div style="background: #f0fdf4; border: 1px solid #22c55e; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.9rem;">
-                <strong>✅ Showing all requirements</strong>
+            <div style="background: #dbeafe; border: 1px solid #3b82f6; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.9rem;">
+                <strong>🔵 Showing all requirements</strong>
             </div>
         """, unsafe_allow_html=True)
     
@@ -625,18 +226,6 @@ with st.sidebar:
             st.markdown("*No documents loaded*")
     except Exception as e:
         st.markdown(f"*Error loading documents: {str(e)}*")
-    
-    # Help Section
-    st.markdown("""
-        <div class="sidebar-section">
-            <h3>❓ How to Use</h3>
-            <div style="font-size: 0.85rem; color: #475569; line-height: 1.4;">
-                <p><strong>�🔍 Search:</strong> Enter keywords to filter requirements</p>
-                <p><strong>📋 Tabs:</strong> Switch between different analysis views</p>
-                <p><strong>🗑️ Clear:</strong> Reset search to see all requirements</p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
 
 # Define the unified search query for all tabs to use
 search_instance = st.session_state.get('search_instance', 0)
@@ -647,8 +236,8 @@ search_quality = unified_search_query
 search_tests = unified_search_query
 search_traceability = unified_search_query
 
-tab_search, tab_summaries, tab_quality, tab_tests, tab_traceability, tab_dashboard = st.tabs(
-    ["Search", "Summaries", "Quality", "Test ideas", "Traceability", "Dashboard"]
+tab_search, tab_summaries_traceability, tab_quality, tab_tests, tab_dashboard = st.tabs(
+    ["Search", "Summaries & Traceability", "Quality", "Test Scenarios", "Dashboard"]
 )
 
 def show_sources(sources):
@@ -838,7 +427,7 @@ with tab_search:
                         answer_list += f"- {desc}<br>"
                     
                     st.markdown(f"""
-                        <div class="content-card" style="background-color: #f0fdf4; border-left: 4px solid #22c55e;">
+                        <div class="content-card" style="background-color: #dbeafe; border-left: 4px solid #3b82f6;">
                             <h3 style="margin-top: 0; margin-bottom: 1rem;">&#129001; Answer</h3>
                             <div style="font-size: 1rem; line-height: 1.5;">
                                 {answer_list}
@@ -862,7 +451,7 @@ with tab_search:
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
-                        <div class="content-card" style="background-color: #f0fdf4; border-left: 4px solid #22c55e;">
+                        <div class="content-card" style="background-color: #dbeafe; border-left: 4px solid #3b82f6;">
                             <h3 style="margin-top: 0; margin-bottom: 1rem;">&#129001; Answer</h3>
                             <div style="font-size: 1rem; line-height: 1.5;">
                                 {answer}
@@ -932,104 +521,106 @@ with tab_search:
             print(f"[ERROR] Exception in QA call: {e}\n{tb}")
             st.text(tb)
 
-with tab_summaries:
+with tab_summaries_traceability:
+    # Create sub-tabs for Summaries and Traceability
+    subtab_summaries, subtab_traceability = st.tabs(["Summaries", "Traceability"])
     
-    try:
-        results = get_normalized_requirements()
-        if results:
-            # Filter results based on search query
-            filtered_results = results
-            if search_summaries:
-                search_terms = search_summaries.lower().split()
-                filtered_results = []
-                for r in results:
-                    text_to_search = f"{r['text']} {r['normalized']} {' '.join(r['categories'])}".lower()
-                    if all(term in text_to_search for term in search_terms):
-                        filtered_results.append(r)
-            
-            if filtered_results:
-                df = pd.DataFrame([
-                    {
-                        "Source document": r["source"].replace("data/", "") if r["source"].startswith("data/") else r["source"],
-                        "Requirement": r["text"],
-                        "Summary": r["normalized"],
-                        "Type": ", ".join(r["categories"]),
-                    }
-                    for r in filtered_results
-                ])
-                
-                # Show search results count
+    with subtab_summaries:
+        try:
+            results = get_normalized_requirements()
+            if results:
+                # Filter results based on search query
+                filtered_results = results
                 if search_summaries:
-                    st.info(f"Found {len(filtered_results)} requirement(s) matching '{search_summaries}'")
+                    search_terms = search_summaries.lower().split()
+                    filtered_results = []
+                    for r in results:
+                        text_to_search = f"{r['text']} {r['normalized']} {' '.join(r['categories'])}".lower()
+                        if all(term in text_to_search for term in search_terms):
+                            filtered_results.append(r)
                 
-                # Display table with centered headers using HTML
-                st.markdown("""
-                    <style>
-                    .summaries-table-container {
-                        width: 100%;
-                        overflow-x: auto;
-                        overflow-y: auto;
-                        max-height: 600px;
-                        border: 1px solid #dee2e6;
-                        border-radius: 8px;
-                        margin: 1rem 0;
-                    }
-                    .summaries-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 0;
-                    }
-                    .summaries-table th {
-                        background-color: #f8f9fa;
-                        border: 1px solid #dee2e6;
-                        padding: 12px;
-                        text-align: center !important;
-                        font-weight: 600;
-                        color: #495057;
-                        position: sticky;
-                        top: 0;
-                        z-index: 10;
-                    }
-                    .summaries-table td {
-                        border: 1px solid #dee2e6;
-                        padding: 12px;
-                        vertical-align: top;
-                    }
-                    .summaries-table tr:nth-child(even) {
-                        background-color: #f8f9fa;
-                    }
-                    .summaries-table tr:hover {
-                        background-color: #e9ecef;
-                    }
-                    </style>
-                """, unsafe_allow_html=True)
-                
-                # Convert to HTML table with scrollable container
-                html_table = df.to_html(classes='summaries-table', escape=False, index=False)
-                st.markdown(f'<div class="summaries-table-container">{html_table}</div>', unsafe_allow_html=True)
-                for r in filtered_results:
-                    if DEBUG:
-                        print("NORMALIZED FIELD:", repr(r["normalized"]))
-                    break
-            else:
-                if search_summaries:
-                    st.warning(f"No requirements found matching '{search_summaries}'")
+                if filtered_results:
+                    df = pd.DataFrame([
+                        {
+                            "Requirement": r["text"],
+                            "Summary": r["normalized"],
+                            "Type": ", ".join(r["categories"]),
+                            "Source document": r["source"].replace("data/", "") if r["source"].startswith("data/") else r["source"],
+                        }
+                        for r in filtered_results
+                    ])
+                    
+                    # Show search results count
+                    if search_summaries:
+                        st.info(f"Found {len(filtered_results)} requirement(s) matching '{search_summaries}'")
+                    
+                    # Custom HTML table so long requirements wrap instead of being truncated
+                    st.markdown("""
+                        <style>
+                        .summaries-table-container {
+                            width: 100%;
+                            max-height: 600px;
+                            overflow-y: auto;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            background: #ffffff;
+                        }
+                        .summaries-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 0.95rem;
+                        }
+                        .summaries-table th {
+                            position: sticky;
+                            top: 0;
+                            background: #f8fafc;
+                            border-bottom: 1px solid #e2e8f0;
+                            padding: 8px 10px;
+                            text-align: left;
+                            font-weight: 600;
+                        }
+                        .summaries-table td {
+                            border-top: 1px solid #e5e7eb;
+                            padding: 6px 10px;
+                            vertical-align: top;
+                            /* ✅ allow long requirement text to wrap */
+                            white-space: normal !important;
+                            word-wrap: break-word;
+                        }
+                        .summaries-table tr:nth-child(even) {
+                            background: #f9fafb;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+
+                    html_table = df.to_html(
+                        classes="summaries-table",
+                        index=False,
+                        escape=False,
+                    )
+
+                    st.markdown(
+                        f'<div class="summaries-table-container">{html_table}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    
+                    for r in filtered_results:
+                        if DEBUG:
+                            print("NORMALIZED FIELD:", repr(r["normalized"]))
+                        break
                 else:
-                    st.info("No requirements processed.")
-        else:
-            st.info("No requirements processed.")
-    except Exception as e:
-        st.error(f"Failed to process requirements: {e}")
+                    if search_summaries:
+                        st.warning(f"No requirements found matching '{search_summaries}'")
+                    else:
+                        st.info("No requirements processed.")
+            else:
+                st.info("No requirements processed.")
+        except Exception as e:
+            st.error(f"Failed to process requirements: {e}")
 
 with tab_quality:
     # Add anchor for back to top functionality
     st.markdown('<div id="quality-top"></div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-        <div class="section-header">
-            <h2 style="margin: 0;">&#129529; Clarity & Ambiguity Checks</h2>
-        </div>
-    """, unsafe_allow_html=True)
     
     try:
         requirement_rows = get_clarity_results()
@@ -1072,9 +663,45 @@ with tab_quality:
         # Calculate dependencies once for all subtabs
         missing_refs, circular_refs = analyze_dependencies(requirement_rows)
 
+        # Add custom styling for subtabs
+        st.markdown("""
+            <style>
+            /* Quality tab subtabs styling - more specific targeting */
+            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+                gap: 8px;
+                background-color: #f1f5f9;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            
+            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab"] {
+                height: 32px !important;
+                padding: 0px 12px !important;
+                background-color: #cbd5e1 !important;
+                border-radius: 4px;
+                border: none;
+                font-size: 0.85rem !important;
+                font-weight: 500;
+                color: #475569 !important;
+                min-width: auto !important;
+            }
+            
+            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
+                background-color: #1e40af !important;
+                color: white !important;
+                box-shadow: 0 1px 3px rgba(30, 64, 175, 0.3);
+            }
+            
+            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab"]:not([aria-selected="true"]):hover {
+                background-color: #3b82f6 !important;
+                color: white !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         # Create sub-tabs for the Quality tab
         subtab_analysis, subtab_dependency = st.tabs(
-            ["Table View & Details", "Dependency & Consistency Check"]
+            ["Analysis", "Dependencies"]
         )
 
         with subtab_analysis:
@@ -1229,34 +856,135 @@ with tab_quality:
             """, unsafe_allow_html=True)
 
         with subtab_dependency:
+            # Add professional styling for Dependencies tab
+            st.markdown("""
+                <style>
+                .dependency-section {
+                    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin: 1rem 0;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                    border: 1px solid #e2e8f0;
+                }
+                
+                .status-card {
+                    background: white;
+                    border-radius: 8px;
+                    padding: 1.25rem;
+                    margin: 0.75rem 0;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+                    border: 1px solid #e5e7eb;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                }
+                
+                .status-card:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+                }
+                
+                .status-icon {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 2.5rem;
+                    height: 2.5rem;
+                    border-radius: 50%;
+                    font-size: 1.25rem;
+                    margin-right: 1rem;
+                }
+                
+                .status-success {
+                    background-color: #dcfce7;
+                    color: #16a34a;
+                    border-left: 4px solid #22c55e;
+                }
+                
+                .status-warning {
+                    background-color: #fef3c7;
+                    color: #d97706;
+                    border-left: 4px solid #f59e0b;
+                }
+                
+                .status-error {
+                    background-color: #fee2e2;
+                    color: #dc2626;
+                    border-left: 4px solid #ef4444;
+                }
+                
+                .circular-refs {
+                    background: linear-gradient(45deg, #fef2f2 0%, #fecaca 100%);
+                    border: 1px solid #f87171;
+                    border-radius: 6px;
+                    padding: 1rem;
+                    margin: 0.75rem 0;
+                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                }
+                
+                .ref-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin: 0.5rem 0;
+                    padding: 0.5rem;
+                    background: rgba(255, 255, 255, 0.7);
+                    border-radius: 4px;
+                }
+                
+                .section-title {
+                    color: #1e293b;
+                    font-weight: 600;
+                    font-size: 1.1rem;
+                    margin: 0 0 0.5rem 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                </style>
+            """, unsafe_allow_html=True)
 
             if missing_refs:
                 st.markdown(f"""
-                    <div class="content-card" style="background-color: #fef3cd; border-left: 4px solid #f59e0b; margin-bottom: 1rem;">
-                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                            <span style="font-size: 1.5rem; color: #f59e0b;">⚠️</span>
-                            <div>
-                                <h5 style="margin: 0 0 0.5rem 0; color: #92400e;">Missing References Found</h5>
-                                <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
-                                    The following requirement IDs are referenced but do not exist in the current dataset:
-                                </p>
-                                <ul style="margin: 0.5rem 0 0 0; color: #92400e;">
-                                    {''.join([f'<li><code>{ref}</code></li>' for ref in sorted(missing_refs)])}
-                                </ul>
+                    <div class="dependency-section">
+                        <div class="status-card status-warning">
+                            <div style="display: flex; align-items: flex-start;">
+                                <div class="status-icon" style="background-color: #fef3c7; color: #d97706;">
+                                    ⚠️
+                                </div>
+                                <div style="flex: 1;">
+                                    <h3 class="section-title" style="color: #d97706;">
+                                        Missing References Detected
+                                    </h3>
+                                    <p style="margin: 0 0 1rem 0; color: #92400e; line-height: 1.5;">
+                                        The following requirement IDs are referenced but do not exist in the current dataset:
+                                    </p>
+                                    <div class="circular-refs" style="background: linear-gradient(45deg, #fef3c7 0%, #fed7aa 100%); border-color: #f59e0b;">
+                                        {''.join([f'<div class="ref-item"><span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600;">REF</span><code style="color: #92400e; font-weight: 600;">{ref}</code></div>' for ref in sorted(missing_refs)])}
+                                    </div>
+                                    <p style="margin: 0.75rem 0 0 0; color: #92400e; font-size: 0.9rem; font-style: italic;">
+                                        💡 <strong>Recommendation:</strong> Verify these requirement IDs exist or update the references.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown("""
-                    <div class="content-card" style="background-color: #d1fae5; border-left: 4px solid #10b981;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <span style="font-size: 1.5rem; color: #10b981;">✅</span>
-                            <div>
-                                <h5 style="margin: 0; color: #065f46;">All References Valid</h5>
-                                <p style="margin: 0; color: #065f46; font-size: 0.9rem;">
-                                    No missing requirement references detected in the current dataset.
-                                </p>
+                    <div class="dependency-section">
+                        <div class="status-card status-success">
+                            <div style="display: flex; align-items: center;">
+                                <div class="status-icon" style="background-color: #dcfce7; color: #16a34a;">
+                                    ✅
+                                </div>
+                                <div>
+                                    <h3 class="section-title" style="color: #16a34a;">
+                                        All References Valid
+                                    </h3>
+                                    <p style="margin: 0; color: #065f46; line-height: 1.5;">
+                                        No missing requirement references detected. All dependency links are valid.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1264,34 +992,46 @@ with tab_quality:
 
             if circular_refs:
                 st.markdown(f"""
-                    <div class="content-card" style="background-color: #fee2e2; border-left: 4px solid #ef4444; margin-bottom: 1rem;">
-                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                            <span style="font-size: 1.5rem; color: #ef4444;">🚨</span>
-                            <div>
-                                <h5 style="margin: 0 0 0.5rem 0; color: #dc2626;">Circular Dependencies Detected</h5>
-                                <p style="margin: 0 0 0.75rem 0; color: #dc2626; font-size: 0.9rem;">
-                                    The following circular reference patterns were found:
-                                </p>
-                                <div style="background-color: #fef2f2; padding: 0.75rem; border-radius: 0.375rem; border: 1px solid #fecaca;">
-                                    {''.join([f'<div style="color: #dc2626; font-family: monospace; margin: 0.25rem 0;"><strong>{a}</strong> ↔ <strong>{b}</strong></div>' for a, b in circular_refs])}
+                    <div class="dependency-section">
+                        <div class="status-card status-error">
+                            <div style="display: flex; align-items: flex-start;">
+                                <div class="status-icon" style="background-color: #fee2e2; color: #dc2626;">
+                                    🚨
                                 </div>
-                                <p style="margin: 0.75rem 0 0 0; color: #dc2626; font-size: 0.85rem; font-style: italic;">
-                                    💡 Tip: Review these requirements to break the circular dependency chain.
-                                </p>
+                                <div style="flex: 1;">
+                                    <h3 class="section-title" style="color: #dc2626;">
+                                        Circular Dependencies Detected
+                                    </h3>
+                                    <p style="margin: 0 0 1rem 0; color: #dc2626; line-height: 1.5;">
+                                        The following circular reference patterns were found:
+                                    </p>
+                                    <div class="circular-refs">
+                                        {''.join([f'<div class="ref-item"><span style="background: #dc2626; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600;">CIRCULAR</span><strong style="color: #dc2626;">{a}</strong> <span style="color: #6b7280;">↔</span> <strong style="color: #dc2626;">{b}</strong></div>' for a, b in circular_refs])}
+                                    </div>
+                                    <p style="margin: 0.75rem 0 0 0; color: #dc2626; font-size: 0.9rem; font-style: italic;">
+                                        💡 <strong>Critical:</strong> Review these requirements immediately to break the circular dependency chain.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown("""
-                    <div class="content-card" style="background-color: #d1fae5; border-left: 4px solid #10b981;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <span style="font-size: 1.5rem; color: #10b981;">✅</span>
-                            <div>
-                                <h5 style="margin: 0; color: #065f46;">No Circular Dependencies</h5>
-                                <p style="margin: 0; color: #065f46; font-size: 0.9rem;">
-                                    No circular reference patterns detected. Dependency structure is clean.
-                                </p>
+                    <div class="dependency-section">
+                        <div class="status-card status-success">
+                            <div style="display: flex; align-items: center;">
+                                <div class="status-icon" style="background-color: #dcfce7; color: #16a34a;">
+                                    ✅
+                                </div>
+                                <div>
+                                    <h3 class="section-title" style="color: #16a34a;">
+                                        No Circular Dependencies
+                                    </h3>
+                                    <p style="margin: 0; color: #065f46; line-height: 1.5;">
+                                        No circular reference patterns detected. Dependency structure is clean and well-organized.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1300,10 +1040,79 @@ with tab_quality:
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
 
+def render_compact_test_card(requirement, clarity_score, status):
+    """Render a very compact test card with minimal vertical space"""
+    with st.container():
+        # Mini header
+        col1, col2 = st.columns([4,1])
+        with col1:
+            st.markdown(f"**{requirement['Requirement']}**")
+        with col2:
+            score_text = str(clarity_score) if clarity_score is not None else 'n/a'
+            st.caption(f"Score: {score_text}")
+        
+        # Generate and show test scenarios in compact format
+        ideas = generate_test_ideas(requirement["Requirement"])
+        
+        with st.expander(f"{len(ideas['ideas'])} test scenario(s)", expanded=False):
+            for i, idea in enumerate(ideas['ideas'][:3]):  # Limit to 3 for space
+                st.markdown(f"**{idea.get('title')}**")
+                
+                # Show all steps/acceptance (no truncation)
+                steps = list(idea.get('steps', []))
+                acceptance = list(idea.get('acceptance', []))
+                
+                # Mask for non-ready status
+                if status in ('provisional','blocked'):
+                    def _mask(s):
+                        return re.sub(r"\b\d+(?:\.\d+)?\b", "<target>", s)
+                    steps = [_mask(s) for s in steps]
+                    acceptance = [_mask(a) for a in acceptance]
+                
+                # Format acceptance criteria with proper capitalization
+                def format_acceptance(text):
+                    # Split by common sentence starters and rejoin with proper capitalization
+                    parts = re.split(r'\b(Given|When|Then|And|But)\b', text)
+                    formatted_parts = []
+                    for i, part in enumerate(parts):
+                        if part in ['Given', 'When', 'Then', 'And', 'But']:
+                            if i == 0:  # First word stays capitalized
+                                formatted_parts.append(part)
+                            else:  # Subsequent instances become lowercase
+                                formatted_parts.append(part.lower())
+                        else:
+                            formatted_parts.append(part)
+                    result = ''.join(formatted_parts)
+                    # Ensure the first character is capitalized
+                    if result and result[0].islower():
+                        result = result[0].upper() + result[1:]
+                    return result
+                
+                formatted_acceptance = [format_acceptance(a) for a in acceptance]
+                
+                if steps:
+                    steps_html = "<br>".join([f"{j}. {step}" for j, step in enumerate(steps, 1)])
+                    st.markdown(f'<div style="font-size:0.9rem; line-height:1.1;"><strong>Steps:</strong><br>{steps_html}</div>', unsafe_allow_html=True)
+                if formatted_acceptance:
+                    accept_html = "<br>".join([f"{accept}" for accept in formatted_acceptance])
+                    st.markdown(f'<div style="font-size:0.9rem; line-height:1.1;"><br><strong>Accept:</strong><br>{accept_html}</div>', unsafe_allow_html=True)
+                
+                if i < len(ideas['ideas']) - 1:
+                    st.divider()
+        
+        # Compact export status
+        if status == 'blocked':
+            st.caption("🚫 Export disabled")
+        elif status == 'provisional':
+            confirm_key = f"confirm_prov_{abs(hash(requirement['Requirement']))}"
+            st.checkbox('✓ Confirm for export', key=confirm_key, help="Confirm export for provisional item")
+        else:
+            st.caption("✅ Ready for export")
+        
+        st.divider()
+
 st.divider()
 with tab_tests:
-    st.markdown("## 🧪 Test Ideas for Requirements")
-    
     try:
         requirement_rows = get_requirement_rows()
         if not requirement_rows:
@@ -1342,130 +1151,540 @@ with tab_tests:
             else:
                 st.info(f"Found {len(requirement_rows)} requirement(s) matching '{search_tests}'")
 
-        st.divider()
+        # Precompute clarity lookup to gate test exports and UI
+        clarity_rows = get_clarity_results()
+        clarity_map = { (c["Requirement"], c["Source"]): c for c in clarity_rows }
+
+        # Add CSS for better download button visibility
+        st.markdown("""
+        <style>
+        div[data-testid="stDownloadButton"] > button {
+            background-color: #0066cc !important;
+            color: white !important;
+            border: 1px solid #0066cc !important;
+            padding: 0.25rem 0.75rem !important;
+            border-radius: 6px !important;
+            font-size: 0.875rem !important;
+            font-weight: 500 !important;
+            opacity: 1 !important;
+        }
+        div[data-testid="stDownloadButton"] > button:hover {
+            background-color: #0052a3 !important;
+            border-color: #0052a3 !important;
+            color: white !important;
+        }
+        div[data-testid="stDownloadButton"] > button > div {
+            color: white !important;
+        }
+        div[data-testid="stDownloadButton"] > button > div > span {
+            color: white !important;
+        }
+        div[data-testid="stDownloadButton"] > button p {
+            color: white !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Status-based organization for space efficiency
+        ready_reqs = []
+        provisional_reqs = []
+        blocked_reqs = []
+        
         for r in requirement_rows:
-            with st.expander(f"{r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''}"):
-                status = "ready"
-                issues = {i["type"] for i in r.get("Issues", [])}
-                if "TBD" in issues:
-                    status = "blocked"
-                elif {"Ambiguous", "NonVerifiable", "PassiveVoice"} & issues:
-                    status = "provisional"
+            req_key = (r["Requirement"], r["Source"])
+            clarity = clarity_map.get(req_key, None)
+            clarity_score = None
+            issues_set = set()
+            if clarity:
+                clarity_score = clarity.get("ClarityScore") if isinstance(clarity, dict) else getattr(clarity, "ClarityScore", None)
+                raw_issues = clarity.get("Issues", []) if isinstance(clarity, dict) else getattr(clarity, "Issues", [])
+                for i in raw_issues:
+                    if isinstance(i, dict):
+                        issues_set.add(i.get("type"))
+                    else:
+                        issues_set.add(getattr(i, "type", None))
 
-                badge = {"ready": "✅ Ready", "provisional": "🟡 Provisional", "blocked": "🚩 Blocked"}[status]
-                st.markdown(f"**Status:** {badge}")
-
-                ideas = generate_test_ideas(r["Requirement"])
-                st.caption(f"Requirement type: **{ideas['type']}**")
-
-                if status == "blocked":
-                    st.warning("REQUIRES SPECIFICATION — replace TBD/XXX before finalizing.")
-                elif status == "provisional":
-                    st.info("Provisional — refine vague terms or add measurable thresholds.")
-
-                for idea in ideas["ideas"]:
-                    st.markdown(f"**{idea['title']}**")
-                    st.markdown("- **Steps:**")
-                    for step in idea["steps"]:
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;- {step}", unsafe_allow_html=True)
-                    st.markdown("- **Acceptance:**")
-                    for acc in idea["acceptance"]:
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;- {acc}", unsafe_allow_html=True)
-                    st.markdown("---")
-    except Exception as e:
-        st.error(f"Failed to generate test ideas: {e}")
-
-with tab_traceability:
-    st.markdown("## 📊 Traceability Matrix")
-    
-    try:
-        requirement_rows = get_requirement_rows()
-        if not requirement_rows:
-            st.info("No requirements detected.")
-            st.stop()
-
-        # Filter requirements based on search query
-        if search_traceability:
-            search_terms = search_traceability.lower().split()
-            filtered_requirement_rows = []
-            
-            # Get the original normalized data for more comprehensive search
-            normalized_results = get_normalized_requirements()
-            
-            for r in requirement_rows:
-                # Find the corresponding normalized data for this requirement
-                normalized_data = None
-                for norm_r in normalized_results:
-                    if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
-                        normalized_data = norm_r
-                        break
-                
-                # Search in requirement text, source, normalized text, and categories
-                text_to_search = f"{r['Requirement']} {r['Source']}".lower()
-                if normalized_data:
-                    text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
-                
-                if all(term in text_to_search for term in search_terms):
-                    filtered_requirement_rows.append(r)
-            
-            requirement_rows = filtered_requirement_rows
-            
-            if not requirement_rows:
-                st.warning(f"No requirements found matching '{search_traceability}'")
-                st.stop()
+            # Determine status
+            if "TBD" in issues_set or (clarity_score is not None and clarity_score < 80):
+                blocked_reqs.append((r, clarity_score))
+            elif clarity_score is not None and 80 <= clarity_score < 100:
+                provisional_reqs.append((r, clarity_score))
             else:
-                st.info(f"Found {len(requirement_rows)} requirement(s) matching '{search_traceability}'")
+                ready_reqs.append((r, clarity_score))
 
-        trace_df = build_trace_matrix(requirement_rows)
-        st.dataframe(trace_df, use_container_width=True)
-        csv_bytes = trace_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="Download Traceability Matrix CSV",
-            data=csv_bytes,
-            file_name="traceability_matrix.csv",
-            mime="text/csv",
-            key="trace_matrix_download"
-        )
+        # Visibility controls with counts
+        st.markdown("**Show sections:**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            show_ready = st.checkbox(f"Ready ({len(ready_reqs)})", value=True, key="show_ready_tests")
+        with col2:
+            show_provisional = st.checkbox(f"Provisional ({len(provisional_reqs)})", value=True, key="show_provisional_tests")
+        with col3:
+            show_blocked = st.checkbox(f"Blocked ({len(blocked_reqs)})", value=False, key="show_blocked_tests")
+        
+        st.divider()
+        
+        # Single download button for all test scenarios
+        if st.button("Download Test Scenarios", type="primary", help="Download test scenarios for all visible requirements"):
+            with st.spinner("Generating test scenarios..."):
+                all_export_rows = []
+                
+                # Process all requirements based on current visibility settings
+                for req_data in ready_reqs:
+                    requirement, clarity_score = req_data
+                    if show_ready:
+                        ideas = generate_test_ideas(requirement["Requirement"])
+                        for idea in ideas['ideas']:
+                            steps = list(idea.get('steps', []))
+                            acceptance = list(idea.get('acceptance', []))
+                            
+                            # Format acceptance criteria
+                            def format_acceptance(text):
+                                parts = re.split(r'\b(Given|When|Then|And|But)\b', text)
+                                formatted_parts = []
+                                for j, part in enumerate(parts):
+                                    if part in ['Given', 'When', 'Then', 'And', 'But']:
+                                        if j == 0:
+                                            formatted_parts.append(part)
+                                        else:
+                                            formatted_parts.append(part.lower())
+                                    else:
+                                        formatted_parts.append(part)
+                                result = ''.join(formatted_parts)
+                                if result and result[0].islower():
+                                    result = result[0].upper() + result[1:]
+                                return result
+                            
+                            formatted_acceptance = [format_acceptance(a) for a in acceptance]
+                            
+                            all_export_rows.append({
+                                'requirement': requirement['Requirement'],
+                                'status': 'ready',
+                                'test_scenario': idea.get('title'),
+                                'test_steps': ' | '.join(steps),
+                                'acceptance_criteria': ' | '.join(formatted_acceptance)
+                            })
+                
+                # Process provisional requirements
+                for req_data in provisional_reqs:
+                    requirement, clarity_score = req_data
+                    if show_provisional:
+                        confirm_key = f"confirm_prov_{abs(hash(requirement['Requirement']))}"
+                        if st.session_state.get(confirm_key, False):
+                            ideas = generate_test_ideas(requirement["Requirement"])
+                            for idea in ideas['ideas']:
+                                steps = list(idea.get('steps', []))
+                                acceptance = list(idea.get('acceptance', []))
+                                
+                                # Mask for provisional
+                                def _mask(s):
+                                    return re.sub(r"\b\d+(?:\.\d+)?\b", "<target>", s)
+                                steps = [_mask(s) for s in steps]
+                                acceptance = [_mask(a) for a in acceptance]
+                                
+                                # Format acceptance criteria
+                                def format_acceptance(text):
+                                    parts = re.split(r'\b(Given|When|Then|And|But)\b', text)
+                                    formatted_parts = []
+                                    for j, part in enumerate(parts):
+                                        if part in ['Given', 'When', 'Then', 'And', 'But']:
+                                            if j == 0:
+                                                formatted_parts.append(part)
+                                            else:
+                                                formatted_parts.append(part.lower())
+                                        else:
+                                            formatted_parts.append(part)
+                                    result = ''.join(formatted_parts)
+                                    if result and result[0].islower():
+                                        result = result[0].upper() + result[1:]
+                                    return result
+                                
+                                formatted_acceptance = [format_acceptance(a) for a in acceptance]
+                                
+                                all_export_rows.append({
+                                    'requirement': requirement['Requirement'],
+                                    'status': 'provisional',
+                                    'test_scenario': idea.get('title'),
+                                    'test_steps': ' | '.join(steps),
+                                    'acceptance_criteria': ' | '.join(formatted_acceptance)
+                                })
+                
+                # Generate and provide download
+                if all_export_rows:
+                    out_df = pd.DataFrame(all_export_rows)
+                    csv_bytes = out_df.to_csv(index=False).encode('utf-8')
+                    st.success(f"✅ Generated {len(all_export_rows)} test scenarios!")
+                    st.download_button('⬇️ Click to Download CSV', 
+                                     data=csv_bytes, 
+                                     file_name="all_test_scenarios.csv", 
+                                     mime='text/csv',
+                                     type="primary")
+                else:
+                    st.warning("No test scenarios available for download. Please confirm provisional exports or select different sections.")
+        
+        # Dynamic column layout based on visible sections
+        visible_sections = []
+        if show_ready and ready_reqs:
+            visible_sections.append(("ready", ready_reqs, "✅ Ready"))
+        if show_provisional and provisional_reqs:
+            visible_sections.append(("provisional", provisional_reqs, "🟡 Provisional"))
+        if show_blocked and blocked_reqs:
+            visible_sections.append(("blocked", blocked_reqs, "🚩 Blocked"))
+        
+        if not visible_sections:
+            st.info("No sections selected or no requirements match the current criteria.")
+        else:
+            # Create columns based on number of visible sections
+            if len(visible_sections) == 1:
+                cols = [st.container()]
+            elif len(visible_sections) == 2:
+                cols = st.columns(2)
+            else:
+                cols = st.columns(3)
+            
+            for i, (status, reqs, title) in enumerate(visible_sections):
+                with cols[i]:
+                    expanded = (status == "ready") or (status == "provisional" and not show_ready)
+                    with st.expander(f"{title} ({len(reqs)})", expanded=expanded):
+                        if reqs:
+                            for r_data in reqs:
+                                render_compact_test_card(r_data[0], r_data[1], status)
+                        else:
+                            st.info(f"No {status} requirements")
+
     except Exception as e:
-        st.error(f"Failed to generate traceability matrix: {e}")
+        st.error(f"Failed to generate test scenarios: {e}")
+
+    with subtab_traceability:
+        st.markdown("## 📊 Traceability Matrix")
+        
+        try:
+            requirement_rows = get_requirement_rows()
+            if not requirement_rows:
+                st.info("No requirements detected.")
+                st.stop()
+
+            # Filter requirements based on search query
+            if search_traceability:
+                search_terms = search_traceability.lower().split()
+                filtered_requirement_rows = []
+                
+                # Get the original normalized data for more comprehensive search
+                normalized_results = get_normalized_requirements()
+                
+                for r in requirement_rows:
+                    # Find the corresponding normalized data for this requirement
+                    normalized_data = None
+                    for norm_r in normalized_results:
+                        if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
+                            normalized_data = norm_r
+                            break
+                    
+                    # Search in requirement text, source, normalized text, and categories
+                    text_to_search = f"{r['Requirement']} {r['Source']}".lower()
+                    if normalized_data:
+                        text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
+                    
+                    if all(term in text_to_search for term in search_terms):
+                        filtered_requirement_rows.append(r)
+                
+                requirement_rows = filtered_requirement_rows
+                
+                if not requirement_rows:
+                    st.warning(f"No requirements found matching '{search_traceability}'")
+                    st.stop()
+                else:
+                    st.info(f"Found {len(requirement_rows)} requirement(s) matching '{search_traceability}'")
+
+            trace_df = build_trace_matrix(requirement_rows)
+            # Reorder and rename columns for display/export per user's requested order
+            display_df = trace_df.rename(columns={
+                "ReqID": "Requirement ID",
+                "DependsOn": "Depends On",
+                "Covers": "Verifies",
+                "CoveredBy": "Verified By",
+                "Source": "Source document"
+            })
+            
+            # Clean up source document names - remove "data/" and keep only filename
+            if "Source document" in display_df.columns:
+                display_df["Source document"] = display_df["Source document"].apply(
+                    lambda x: x.replace("data/", "").split("/")[-1] if isinstance(x, str) else x
+                )
+            
+            desired_cols = [
+                "Requirement ID",
+                "Type",
+                "Requirement",
+                "Depends On",
+                "Verifies",
+                "Verified By",
+                "Source document",
+            ]
+            # Only keep columns that exist (defensive) and preserve order
+            cols_present = [c for c in desired_cols if c in display_df.columns]
+            display_df = display_df.reindex(columns=cols_present)
+
+            # Custom HTML table so long requirements wrap instead of being truncated
+            st.markdown("""
+                <style>
+                .traceability-table-container {
+                    width: 100%;
+                    max-height: 600px;
+                    overflow-y: auto;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    background: #ffffff;
+                }
+                .traceability-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.95rem;
+                }
+                .traceability-table th {
+                    position: sticky;
+                    top: 0;
+                    background: #f8fafc;
+                    border-bottom: 1px solid #e2e8f0;
+                    padding: 8px 10px;
+                    text-align: left;
+                    font-weight: 600;
+                }
+                .traceability-table td {
+                    border-top: 1px solid #e5e7eb;
+                    padding: 6px 10px;
+                    vertical-align: top;
+                    /* ✅ allow long requirement text to wrap */
+                    white-space: normal !important;
+                    word-wrap: break-word;
+                }
+                .traceability-table tr:nth-child(even) {
+                    background: #f9fafb;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            html_table = display_df.to_html(
+                classes="traceability-table",
+                index=False,
+                escape=False,
+            )
+
+            st.markdown(
+                f'<div class="traceability-table-container">{html_table}</div>',
+                unsafe_allow_html=True,
+            )
+            csv_bytes = display_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="Download Traceability Matrix CSV",
+                data=csv_bytes,
+                file_name="traceability_matrix.csv",
+                mime="text/csv",
+                key="trace_matrix_download"
+            )
+        except Exception as e:
+            st.error(f"Failed to generate traceability matrix: {e}")
 
 with tab_dashboard:
     st.markdown("## 📊 Requirements Dashboard")
-
-    results = get_normalized_requirements()
-    total_reqs = len(results)
-    st.metric("Total Requirements", total_reqs)
-
-    clarity_rows = get_clarity_results()
-    issue_counts = {"TBD": 0, "Ambiguous": 0, "NonVerifiable": 0, "PassiveVoice": 0}
-    for r in clarity_rows:
-        types = {i.type for i in r["Issues"]}
-        if "TBD" in types: issue_counts["TBD"] += 1
-        if "Ambiguous" in types: issue_counts["Ambiguous"] += 1
-        if "NonVerifiable" in types: issue_counts["NonVerifiable"] += 1
-        if "PassiveVoice" in types: issue_counts["PassiveVoice"] += 1
-
-    st.metric("% with TBD", f"{100 * issue_counts['TBD'] / total_reqs:.1f}%" if total_reqs else "0%")
-    st.metric("% Ambiguous", f"{100 * issue_counts['Ambiguous'] / total_reqs:.1f}%" if total_reqs else "0%")
-    st.metric("% Non-Verifiable", f"{100 * issue_counts['NonVerifiable'] / total_reqs:.1f}%" if total_reqs else "0%")
-    st.metric("% Passive Voice", f"{100 * issue_counts['PassiveVoice'] / total_reqs:.1f}%" if total_reqs else "0%")
-
-    requirement_rows = [
-        {"Source": r["source"], "Requirement": r["text"]}
-        for r in results
-    ]
-    trace_df = build_trace_matrix(requirement_rows)
-    sys_rows = trace_df[trace_df["Type"] == "System"]
-    sys_covered = sys_rows[sys_rows["CoveredBy"].apply(lambda x: any(tid.startswith("TST-") for tid in x.split(",") if tid.strip()))]
-    coverage_pct = 100 * len(sys_covered) / len(sys_rows) if len(sys_rows) else 0
-    st.metric("SYS Coverage by TST", f"{coverage_pct:.1f}%")
-
-    all_categories = [cat for r in results for cat in r.get("categories", [])]
-    if all_categories:
-        cat_series = pd.Series(all_categories)
-        st.bar_chart(cat_series.value_counts())
-    else:
-        st.info("Category distribution not available (no categories found).")
+    
+    try:
+        results = get_normalized_requirements()
+        total_reqs = len(results) if results else 0
+        
+        if total_reqs == 0:
+            st.warning("⚠️ No requirements data available. Please load requirements in the Search tab first.")
+        else:
+            # === KPI CARDS ROW ===
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            with col1:
+                st.metric(
+                    label="📋 Total Requirements", 
+                    value=total_reqs,
+                    help="Total number of requirements processed"
+                )
+            
+            # Calculate clarity metrics
+            clarity_rows = get_clarity_results()
+            issue_counts = {"TBD": 0, "Ambiguous": 0, "NonVerifiable": 0, "PassiveVoice": 0}
+            clarity_scores = []
+            
+            for r in clarity_rows:
+                if r.get("ClarityScore") is not None:
+                    clarity_scores.append(r["ClarityScore"])
+                types = {i.type for i in r.get("Issues", [])}
+                if "TBD" in types: issue_counts["TBD"] += 1
+                if "Ambiguous" in types: issue_counts["Ambiguous"] += 1
+                if "NonVerifiable" in types: issue_counts["NonVerifiable"] += 1
+                if "PassiveVoice" in types: issue_counts["PassiveVoice"] += 1
+            
+            avg_clarity = sum(clarity_scores) / len(clarity_scores) if clarity_scores else 0
+            
+            with col2:
+                st.metric(
+                    label="🎯 Avg Clarity Score", 
+                    value=f"{avg_clarity:.1f}",
+                    delta=None,  # Remove confusing delta calculation
+                    help="Average clarity score (1-10 scale, higher is better)"
+                )
+            
+            with col3:
+                tbd_pct = 100 * issue_counts['TBD'] / total_reqs if total_reqs else 0
+                st.metric(
+                    label="🚨 TBD Issues", 
+                    value=f"{tbd_pct:.1f}%",
+                    help="Percentage of requirements with TBD (To Be Determined) content"
+                )
+            
+            with col4:
+                ambiguous_pct = 100 * issue_counts['Ambiguous'] / total_reqs if total_reqs else 0
+                st.metric(
+                    label="⚠️ Ambiguous", 
+                    value=f"{ambiguous_pct:.1f}%",
+                    help="Percentage of requirements with ambiguous language"
+                )
+            
+            # Calculate test coverage
+            requirement_rows = [
+                {"Source": r["source"], "Requirement": r["text"]}
+                for r in results
+            ]
+            trace_df = build_trace_matrix(requirement_rows)
+            sys_rows = trace_df[trace_df["Type"] == "System"]
+            sys_covered = sys_rows[sys_rows["CoveredBy"].apply(lambda x: any(tid.startswith("TST-") for tid in x.split(",") if tid.strip()))] if len(sys_rows) > 0 else pd.DataFrame()
+            coverage_pct = 100 * len(sys_covered) / len(sys_rows) if len(sys_rows) else 0
+            
+            with col5:
+                st.metric(
+                    label="✅ Test Coverage", 
+                    value=f"{coverage_pct:.1f}%",
+                    help="Percentage of system requirements covered by tests"
+                )
+            
+            st.markdown("---")
+            
+            # === COVERAGE VISUALIZATION BAR ===
+            st.markdown("### 📊 Test Coverage Overview")
+            
+            if len(sys_rows) > 0:
+                covered_count = len(sys_covered)
+                uncovered_count = len(sys_rows) - covered_count
+                
+                # Create coverage data
+                coverage_data = pd.DataFrame({
+                    'Status': ['Covered by Tests', 'Not Covered'],
+                    'Count': [covered_count, uncovered_count],
+                    'Percentage': [coverage_pct, 100 - coverage_pct]
+                })
+                
+                # Visual coverage bar using progress bar
+                col_bar1, col_bar2 = st.columns([3, 1])
+                with col_bar1:
+                    st.progress(coverage_pct / 100, text=f"Test Coverage: {coverage_pct:.1f}% ({covered_count}/{len(sys_rows)} system requirements)")
+                with col_bar2:
+                    if coverage_pct >= 80:
+                        st.success("Excellent!")
+                    elif coverage_pct >= 60:
+                        st.warning("Good")
+                    else:
+                        st.error("Needs Improvement")
+                        
+                # Coverage breakdown chart
+                st.bar_chart(coverage_data.set_index('Status')['Count'])
+            else:
+                st.info("💡 No system requirements found for coverage analysis")
+            
+            st.markdown("---")
+            
+            # === SIDE-BY-SIDE CHARTS ===
+            chart_col1, chart_col2 = st.columns(2)
+            
+            # Left chart: Quality Issues Distribution
+            with chart_col1:
+                st.markdown("### 🔍 Quality Issues Distribution")
+                
+                if any(count > 0 for count in issue_counts.values()):
+                    issue_data = pd.DataFrame({
+                        'Issue Type': list(issue_counts.keys()),
+                        'Count': list(issue_counts.values()),
+                        'Percentage': [100 * count / total_reqs for count in issue_counts.values()]
+                    })
+                    issue_data = issue_data[issue_data['Count'] > 0]  # Only show non-zero counts
+                    
+                    # Rename for better display
+                    issue_data['Issue Type'] = issue_data['Issue Type'].replace({
+                        'TBD': 'TBD Content',
+                        'Ambiguous': 'Ambiguous Language', 
+                        'NonVerifiable': 'Non-Verifiable',
+                        'PassiveVoice': 'Passive Voice'
+                    })
+                    
+                    st.bar_chart(issue_data.set_index('Issue Type')['Count'])
+                    
+                    # Show percentages in a small table
+                    st.caption("Issue Breakdown:")
+                    for _, row in issue_data.iterrows():
+                        st.caption(f"• {row['Issue Type']}: {row['Count']} ({row['Percentage']:.1f}%)")
+                else:
+                    st.success("🎉 No quality issues detected!")
+            
+            # Right chart: Requirement Types Distribution  
+            with chart_col2:
+                st.markdown("### 📋 Requirement Types Distribution")
+                
+                all_categories = [cat for r in results for cat in r.get("categories", [])]
+                if all_categories:
+                    cat_series = pd.Series(all_categories)
+                    cat_counts = cat_series.value_counts()
+                    
+                    st.bar_chart(cat_counts)
+                    
+                    # Show percentages
+                    st.caption("Type Breakdown:")
+                    for cat_type, count in cat_counts.head(5).items():  # Top 5
+                        pct = 100 * count / total_reqs
+                        st.caption(f"• {cat_type}: {count} ({pct:.1f}%)")
+                    
+                    if len(cat_counts) > 5:
+                        with st.expander(f"... and {len(cat_counts) - 5} more types"):
+                            for cat_type, count in cat_counts.iloc[5:].items():  # Remaining types
+                                pct = 100 * count / total_reqs
+                                st.caption(f"• {cat_type}: {count} ({pct:.1f}%)")
+                else:
+                    st.info("💡 No requirement type categories available")
+            
+            # === SUMMARY INSIGHTS ===
+            st.markdown("---")
+            st.markdown("### 💡 Key Insights")
+            
+            insights = []
+            
+            if avg_clarity < 5:
+                insights.append("🚨 **Low clarity scores** - Consider reviewing requirement definitions")
+            elif avg_clarity > 7:
+                insights.append("**Good clarity scores** - Requirements are well-defined")
+                
+            if tbd_pct > 20:
+                insights.append("**High TBD content** - Many requirements need further definition")
+            elif tbd_pct == 0:
+                insights.append("✅ **No TBD content** - All requirements are fully defined")
+                
+            if coverage_pct < 50:
+                insights.append("**Low test coverage** - Consider adding more test scenarios")
+            elif coverage_pct > 80:
+                insights.append("🎯 **Excellent test coverage** - Most requirements are tested")
+                
+            if len(insights) == 0:
+                insights.append("📊 **Good overall status** - Requirements are in decent shape")
+            
+            for insight in insights:
+                st.markdown(insight)
+                
+    except Exception as e:
+        st.error(f"Dashboard error: {e}")
+        if DEBUG:
+            st.exception(e)
 
 
 
