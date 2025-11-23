@@ -130,12 +130,12 @@ def get_clarity_results():
         })
     return clarity_rows
 
-# --- UI code starts here ---
+
 # Enhanced header section
 st.markdown("""
-    <div class="content-card" style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
-        <h1 style="color: white; margin-bottom: 0.5rem; font-size: 3rem;">Requirements Analyst Assistant</h1>
-        <p style="font-size: 1.4rem; opacity: 0.9; margin-bottom: 0;">
+    <div class="content-card header-card">
+        <h1 class="header-title">Requirements Analyst Assistant</h1>
+        <p class="header-subtitle">
             AI-powered analysis for software requirements - clarity, quality, and compliance at scale
         </p>
     </div>
@@ -152,8 +152,8 @@ with st.sidebar:
     # Sidebar Header - simplified
     st.markdown("""
         <div class="sidebar-header">
-            <h2 style="margin: 0; font-size: 1.6rem;">Filter Requirements</h2>
-            <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 1.1rem;">
+            <h2 class="sidebar-header-title">Filter Requirements</h2>
+            <p class="sidebar-header-subtitle">
                 Filter and search requirements across all tabs
             </p>
         </div>
@@ -196,7 +196,7 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
-            <div style="background: #dbeafe; border: 1px solid #3b82f6; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.9rem;">
+            <div class="filter-stats">
                 <strong>🔵 Showing all requirements</strong>
             </div>
         """, unsafe_allow_html=True)
@@ -310,9 +310,9 @@ with tab_search:
     
     # Enhanced search interface with consolidated question section
     st.markdown("""
-        <div class="content-card" style="position: relative; z-index: 10;">
-            <h3 style="margin-top: 0;">&#128172; Ask a Question</h3>
-            <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.775rem;">Ask anything about your requirements documents. I can help with analysis, dependencies, quality checks, and more.</p>
+        <div class="content-card question-card">
+            <h3 class="question-title">&#128172; Ask a Question</h3>
+            <p class="question-subtitle">Ask anything about your requirements documents. I can help with analysis, dependencies, quality checks, and more.</p>
         </div>
         
         <script>
@@ -326,53 +326,6 @@ with tab_search:
         </script>
     """, unsafe_allow_html=True)
 
-    # Column layout for text input and clear button
-    st.markdown("""
-        <style>
-        /* Make Ask a Question header and description slightly smaller for better balance */
-        .content-card h3 {
-            font-size: 1.5rem !important;
-            margin-top: 0;
-            margin-bottom: 0.2rem;
-            font-weight: 600;
-        }
-        .content-card p {
-            font-size: 1.1rem !important;
-            color: #64748b;
-            margin-bottom: 0.75rem;
-        }
-
-        /* Reduce input/textarea font size in the search area */
-        .stTextInput>div>div>input,
-        .stTextArea>div>div>textarea,
-        input[type="text"],
-        textarea {
-            font-size: 1.25rem !important;
-            padding: 12px 16px !important;
-        }
-
-        /* Align button text with text input text */
-        button[kind="secondary"] {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            height: 38px !important;
-            padding: 0 12px !important;
-            line-height: 1 !important;
-        }
-        
-        /* Align primary button with text input */
-        button[kind="primary"] {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            height: 38px !important;
-            padding: 0 12px !important;
-            line-height: 1 !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
     col1, col2 = st.columns([3, 1])
     
     with col1:
@@ -427,51 +380,21 @@ with tab_search:
                         answer_list += f"- {desc}<br>"
                     
                     st.markdown(f"""
-                        <div class="content-card" style="background-color: #dbeafe; border-left: 4px solid #3b82f6;">
-                            <h3 style="margin-top: 0; margin-bottom: 1rem;">&#129001; Answer</h3>
-                            <div style="font-size: 1rem; line-height: 1.5;">
+                        <div class="content-card answer-card">
+                            <h3 class="answer-title">&#129001; Answer</h3>
+                            <div class="answer-content">
                                 {answer_list}
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    # Add CSS for consistent text sizing
-                    st.markdown("""
-                        <style>
-                        .content-card p, .content-card div, .content-card span, .content-card li, .content-card ul, .content-card ol {
-                            font-size: 1rem !important;
-                            line-height: 1.5 !important;
-                        }
-                        .content-card h1, .content-card h2, .content-card h4, .content-card h5, .content-card h6 {
-                            font-size: 1rem !important;
-                            font-weight: normal !important;
-                            margin: 0.5rem 0 !important;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
-                        <div class="content-card" style="background-color: #dbeafe; border-left: 4px solid #3b82f6;">
-                            <h3 style="margin-top: 0; margin-bottom: 1rem;">&#129001; Answer</h3>
-                            <div style="font-size: 1rem; line-height: 1.5;">
+                        <div class="content-card answer-card">
+                            <h3 class="answer-title">&#129001; Answer</h3>
+                            <div class="answer-content">
                                 {answer}
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Add CSS for consistent text sizing
-                    st.markdown("""
-                        <style>
-                        .content-card p, .content-card div, .content-card span, .content-card li, .content-card ul, .content-card ol {
-                            font-size: 1rem !important;
-                            line-height: 1.5 !important;
-                        }
-                        .content-card h1, .content-card h2, .content-card h4, .content-card h5, .content-card h6 {
-                            font-size: 1rem !important;
-                            font-weight: normal !important;
-                            margin: 0.5rem 0 !important;
-                        }
-                        </style>
                     """, unsafe_allow_html=True)
 
             with st.container():
@@ -496,8 +419,8 @@ with tab_search:
                             sources_content += f"<p>• {src}</p>"
                 
                 st.markdown(f"""
-                    <div class="content-card" style="background-color: #f8fafc; border-left: 4px solid #64748b;">
-                        <h3 style="margin-top: 0; margin-bottom: 1rem;">&#128196; Sources</h3>
+                    <div class="content-card sources-card">
+                        <h3 class="sources-title">&#128196; Sources</h3>
                         {sources_content}
                     </div>
                 """, unsafe_allow_html=True)
@@ -554,45 +477,6 @@ with tab_summaries_traceability:
                     if search_summaries:
                         st.info(f"Found {len(filtered_results)} requirement(s) matching '{search_summaries}'")
                     
-                    # Custom HTML table so long requirements wrap instead of being truncated
-                    st.markdown("""
-                        <style>
-                        .summaries-table-container {
-                            width: 100%;
-                            max-height: 600px;
-                            overflow-y: auto;
-                            border: 1px solid #e2e8f0;
-                            border-radius: 8px;
-                            background: #ffffff;
-                        }
-                        .summaries-table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            font-size: 0.95rem;
-                        }
-                        .summaries-table th {
-                            position: sticky;
-                            top: 0;
-                            background: #f8fafc;
-                            border-bottom: 1px solid #e2e8f0;
-                            padding: 8px 10px;
-                            text-align: left;
-                            font-weight: 600;
-                        }
-                        .summaries-table td {
-                            border-top: 1px solid #e5e7eb;
-                            padding: 6px 10px;
-                            vertical-align: top;
-                            /* ✅ allow long requirement text to wrap */
-                            white-space: normal !important;
-                            word-wrap: break-word;
-                        }
-                        .summaries-table tr:nth-child(even) {
-                            background: #f9fafb;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
-
                     html_table = df.to_html(
                         classes="summaries-table",
                         index=False,
@@ -663,42 +547,6 @@ with tab_quality:
         # Calculate dependencies once for all subtabs
         missing_refs, circular_refs = analyze_dependencies(requirement_rows)
 
-        # Add custom styling for subtabs
-        st.markdown("""
-            <style>
-            /* Quality tab subtabs styling - more specific targeting */
-            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab-list"] {
-                gap: 8px;
-                background-color: #f1f5f9;
-                border-radius: 6px;
-                padding: 4px;
-            }
-            
-            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab"] {
-                height: 32px !important;
-                padding: 0px 12px !important;
-                background-color: #cbd5e1 !important;
-                border-radius: 4px;
-                border: none;
-                font-size: 0.85rem !important;
-                font-weight: 500;
-                color: #475569 !important;
-                min-width: auto !important;
-            }
-            
-            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
-                background-color: #1e40af !important;
-                color: white !important;
-                box-shadow: 0 1px 3px rgba(30, 64, 175, 0.3);
-            }
-            
-            div[data-testid="stTabs"] div[data-testid="stTabs"] [data-baseweb="tab"]:not([aria-selected="true"]):hover {
-                background-color: #3b82f6 !important;
-                color: white !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
         # Create sub-tabs for the Quality tab
         subtab_analysis, subtab_dependency = st.tabs(
             ["Analysis", "Dependencies"]
@@ -728,9 +576,9 @@ with tab_quality:
             df = pd.DataFrame([
                 {
                     "Clarity": (
-                        f'<a href="#req-{abs(hash(r["Requirement"]))}" style="text-decoration: none; color: #dc2626; font-weight: bold;">{r["ClarityScore"]}</a>'
+                        f'<a href="#req-{abs(hash(r["Requirement"]))}" class="clarity-score-bad">{r["ClarityScore"]}</a>'
                         if r["ClarityScore"] < 100 
-                        else f'<span style="color: #059669; font-weight: bold;">{r["ClarityScore"]}</span>'
+                        else f'<span class="clarity-score-good">{r["ClarityScore"]}</span>'
                     ),
                     "Requirement": r["Requirement"],
                     "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "",
@@ -742,15 +590,9 @@ with tab_quality:
             # Reduced heading size and consistent capitalization
             st.markdown(
                 f"""
-                <div style="background: #f7f7f9; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); padding: 1.5em 1em 1em 1em; margin-bottom: 1em;">
+                <div class="table-wrapper">
                     {df.to_html(escape=False, index=False)}
                 </div>
-                <style>
-                /* Center table headers */
-                table.dataframe thead th {{
-                    text-align: center !important;
-                }}
-                </style>
                 """,
                 unsafe_allow_html=True
             )
@@ -759,23 +601,6 @@ with tab_quality:
 
             # Details & Suggested Rewrites Section (now in same tab)
             st.markdown("### Details & Suggested Rewrites")
-
-            # Ensure Show details button text is visible (white) across themes
-            st.markdown('''
-                <style>
-                /* Target the Show details button more specifically */
-                button:has-text("🔍 Show details"), 
-                button[kind="secondary"]:contains("Show details"),
-                .stButton > button:contains("🔍 Show details"),
-                div[data-testid="stButton"] button:contains("Show details") {
-                    color: #ffffff !important;
-                }
-                /* More aggressive targeting for all secondary buttons with magnifying glass */
-                button[kind="secondary"] {
-                    color: #ffffff !important;
-                }
-                </style>
-            ''', unsafe_allow_html=True)
 
             # Show all filtered requirements by default
             for idx, r in enumerate(filtered_sorted):
@@ -793,12 +618,12 @@ with tab_quality:
                     # Show status badge and main issues only
                     if r["ClarityScore"] == 100:
                         st.markdown(
-                            '<span style="color: #28a745; font-weight: bold; font-size: 1.1em;">✅ No issues detected</span>',
+                            '<span class="status-good">✅ No issues detected</span>',
                             unsafe_allow_html=True
                         )
                     else:
                         main_issues = [i.type for i in r["Issues"]]
-                        st.markdown(f"**🔎 Main issues:** <span style='color:#d9534f'>{', '.join(main_issues)}</span>", unsafe_allow_html=True)
+                        st.markdown(f"**🔎 Main issues:** <span class='main-issues'>{', '.join(main_issues)}</span>", unsafe_allow_html=True)
 
                         # Show details and rewrite only when button is pressed
                         if st.button("🔍 Show details", key=show_details_key):
@@ -856,93 +681,6 @@ with tab_quality:
             """, unsafe_allow_html=True)
 
         with subtab_dependency:
-            # Add professional styling for Dependencies tab
-            st.markdown("""
-                <style>
-                .dependency-section {
-                    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-                    border-radius: 12px;
-                    padding: 1.5rem;
-                    margin: 1rem 0;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-                    border: 1px solid #e2e8f0;
-                }
-                
-                .status-card {
-                    background: white;
-                    border-radius: 8px;
-                    padding: 1.25rem;
-                    margin: 0.75rem 0;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-                    border: 1px solid #e5e7eb;
-                    transition: transform 0.2s ease, box-shadow 0.2s ease;
-                }
-                
-                .status-card:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
-                }
-                
-                .status-icon {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 2.5rem;
-                    height: 2.5rem;
-                    border-radius: 50%;
-                    font-size: 1.25rem;
-                    margin-right: 1rem;
-                }
-                
-                .status-success {
-                    background-color: #dcfce7;
-                    color: #16a34a;
-                    border-left: 4px solid #22c55e;
-                }
-                
-                .status-warning {
-                    background-color: #fef3c7;
-                    color: #d97706;
-                    border-left: 4px solid #f59e0b;
-                }
-                
-                .status-error {
-                    background-color: #fee2e2;
-                    color: #dc2626;
-                    border-left: 4px solid #ef4444;
-                }
-                
-                .circular-refs {
-                    background: linear-gradient(45deg, #fef2f2 0%, #fecaca 100%);
-                    border: 1px solid #f87171;
-                    border-radius: 6px;
-                    padding: 1rem;
-                    margin: 0.75rem 0;
-                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-                }
-                
-                .ref-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    margin: 0.5rem 0;
-                    padding: 0.5rem;
-                    background: rgba(255, 255, 255, 0.7);
-                    border-radius: 4px;
-                }
-                
-                .section-title {
-                    color: #1e293b;
-                    font-weight: 600;
-                    font-size: 1.1rem;
-                    margin: 0 0 0.5rem 0;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-                </style>
-            """, unsafe_allow_html=True)
-
             if missing_refs:
                 st.markdown(f"""
                     <div class="dependency-section">
@@ -1154,36 +892,6 @@ with tab_tests:
         # Precompute clarity lookup to gate test exports and UI
         clarity_rows = get_clarity_results()
         clarity_map = { (c["Requirement"], c["Source"]): c for c in clarity_rows }
-
-        # Add CSS for better download button visibility
-        st.markdown("""
-        <style>
-        div[data-testid="stDownloadButton"] > button {
-            background-color: #0066cc !important;
-            color: white !important;
-            border: 1px solid #0066cc !important;
-            padding: 0.25rem 0.75rem !important;
-            border-radius: 6px !important;
-            font-size: 0.875rem !important;
-            font-weight: 500 !important;
-            opacity: 1 !important;
-        }
-        div[data-testid="stDownloadButton"] > button:hover {
-            background-color: #0052a3 !important;
-            border-color: #0052a3 !important;
-            color: white !important;
-        }
-        div[data-testid="stDownloadButton"] > button > div {
-            color: white !important;
-        }
-        div[data-testid="stDownloadButton"] > button > div > span {
-            color: white !important;
-        }
-        div[data-testid="stDownloadButton"] > button p {
-            color: white !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
 
         # Status-based organization for space efficiency
         ready_reqs = []
@@ -1424,45 +1132,6 @@ with tab_tests:
             # Only keep columns that exist (defensive) and preserve order
             cols_present = [c for c in desired_cols if c in display_df.columns]
             display_df = display_df.reindex(columns=cols_present)
-
-            # Custom HTML table so long requirements wrap instead of being truncated
-            st.markdown("""
-                <style>
-                .traceability-table-container {
-                    width: 100%;
-                    max-height: 600px;
-                    overflow-y: auto;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    background: #ffffff;
-                }
-                .traceability-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 0.95rem;
-                }
-                .traceability-table th {
-                    position: sticky;
-                    top: 0;
-                    background: #f8fafc;
-                    border-bottom: 1px solid #e2e8f0;
-                    padding: 8px 10px;
-                    text-align: left;
-                    font-weight: 600;
-                }
-                .traceability-table td {
-                    border-top: 1px solid #e5e7eb;
-                    padding: 6px 10px;
-                    vertical-align: top;
-                    /* ✅ allow long requirement text to wrap */
-                    white-space: normal !important;
-                    word-wrap: break-word;
-                }
-                .traceability-table tr:nth-child(even) {
-                    background: #f9fafb;
-                }
-                </style>
-            """, unsafe_allow_html=True)
 
             html_table = display_df.to_html(
                 classes="traceability-table",
