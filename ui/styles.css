@@ -295,6 +295,30 @@ pre {
     font-size: 1rem !important;
 }
 
+/* File uploader and sidebar consistent text sizing */
+.stSidebar .stFileUploader p,
+.stSidebar .stFileUploader span,
+.stSidebar .stFileUploader div,
+.stSidebar .uploadedFileName,
+.stSidebar .uploadedFileSize,
+div[data-testid="stFileUploader"] p,
+div[data-testid="stFileUploader"] span,
+div[data-testid="stFileUploader"] div,
+.stSidebar strong,
+.stSidebar em {
+    font-size: 1rem !important;
+}
+
+/* Sidebar file listing and document info consistent sizing */
+.stSidebar ul,
+.stSidebar li,
+.stSidebar ul li,
+.stSidebar p,
+.stSidebar div p {
+    font-size: 1rem !important;
+    line-height: 1.4 !important;
+}
+
 /* DataFrames should be readable */
 .stDataFrame, .stDataFrame * {
     font-size: 1rem !important;
@@ -965,6 +989,32 @@ button[kind="secondary"] {
 
 .arrow {
     color: #6b7280;
+}
+
+/* File uploader button styling */
+div[data-testid="stFileUploader"] button {
+    color: #3b82f6 !important;
+    font-weight: 500 !important;
+    background-color: transparent !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1.5rem !important;
+    transition: all 0.2s ease !important;
+}
+
+div[data-testid="stFileUploader"] button:hover {
+    background-color: #3b82f6 !important;
+    color: white !important;
+}
+
+div[data-testid="stFileUploader"] button span {
+    color: inherit !important;
+}
+
+/* File uploader text and labels */
+div[data-testid="stFileUploader"] p {
+    color: #374151 !important;
+    font-weight: 500 !important;
 }
 
 .test-details {

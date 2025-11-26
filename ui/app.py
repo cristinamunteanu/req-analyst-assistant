@@ -8,21 +8,11 @@ import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
 
-# --- Project-specific imports ---
-from ingestion.loader import load_documents
-from analysis.index import build_index
-from analysis.qa import make_qa
-from analysis.normalize_requirements import normalize_requirements
-from analysis.utils import (
-    split_into_requirements,
-    is_requirement,
-    parse_llm_content,
-    analyze_dependencies,
-)
-from analysis.heuristics import analyze_clarity
-from analysis.rewrites import suggest_rewrites
-from analysis.testgen import generate_test_ideas
-from analysis.traceability import build_trace_matrix, export_trace_matrix_csv
+# --- Lazy imports - only import when needed ---
+# Heavy ML imports moved to functions to avoid issues during Streamlit reruns
+import tempfile
+import shutil
+from pathlib import Path
 
 
 DEBUG = True  # Set to False to disable debug prints
@@ -58,21 +48,108 @@ st.set_page_config(page_title="Requirements Analyst Assistant", page_icon=None, 
 
 load_dotenv()
 
-if "openai_model" not in st.session_state:
-    st.session_state["openai_model"] = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-if "embed_model" not in st.session_state:
-    st.session_state["embed_model"] = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# Initialize session state for uploaded documents
+if "uploaded_docs" not in st.session_state:
+    st.session_state.uploaded_docs = []
+if "use_uploaded" not in st.session_state:
+    st.session_state.use_uploaded = False
 
-def _get_embed_model():
-    return os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+def process_uploaded_files(uploaded_files):
+    """Process uploaded files and return document list."""
+    try:
+        from unstructured.partition.auto import partition
+    except ImportError as e:
+        log(f"Failed to import unstructured: {e}")
+        st.error("Required library 'unstructured' not available. Please check your installation.")
+        return []
+    
+    if not uploaded_files:
+        log("No uploaded files provided to process_uploaded_files")
+        return []
+    
+    docs = []
+    temp_dir = None
+    
+    try:
+        temp_dir = tempfile.mkdtemp()
+        log(f"Created temporary directory: {temp_dir}")
+        
+        for i, uploaded_file in enumerate(uploaded_files):
+            try:
+                log(f"Processing file {i+1}/{len(uploaded_files)}: {uploaded_file.name}")
+                
+                # Validate file object
+                if not hasattr(uploaded_file, 'name') or not hasattr(uploaded_file, 'getvalue'):
+                    log(f"Invalid file object: {uploaded_file}")
+                    continue
+                
+                # Save uploaded file to temporary location
+                temp_file_path = Path(temp_dir) / uploaded_file.name
+                file_content = uploaded_file.getvalue()
+                
+                if len(file_content) == 0:
+                    log(f"File {uploaded_file.name} is empty, skipping")
+                    continue
+                
+                with open(temp_file_path, "wb") as f:
+                    f.write(file_content)
+                log(f"Saved uploaded file to: {temp_file_path} (size: {len(file_content)} bytes)")
+                
+                # Process the file
+                try:
+                    elements = partition(filename=str(temp_file_path))
+                    log(f"Partitioned file {uploaded_file.name}, got {len(elements)} elements")
+                    
+                    text = "\n".join([getattr(el, "text", "") for el in elements if getattr(el, "text", "")])
+                    if text.strip():
+                        docs.append({
+                            "name": uploaded_file.name,
+                            "text": text,
+                            "path": uploaded_file.name,
+                            "source": uploaded_file.name,
+                            "size": len(file_content)
+                        })
+                        log(f"Successfully processed uploaded file: {uploaded_file.name} (text length: {len(text)})")
+                    else:
+                        log(f"No text extracted from file: {uploaded_file.name}")
+                        st.warning(f"No text could be extracted from {uploaded_file.name}")
+                except Exception as partition_error:
+                    error_msg = f"Error partitioning {uploaded_file.name}: {partition_error}"
+                    log(error_msg)
+                    st.warning(error_msg)
+                    continue
+                    
+            except Exception as file_error:
+                error_msg = f"Error processing file {uploaded_file.name}: {file_error}"
+                log(error_msg)
+                st.warning(error_msg)
+                continue
+                
+    except Exception as e:
+        error_msg = f"Error setting up temporary directory: {e}"
+        log(error_msg)
+        st.error(error_msg)
+        return []
+    finally:
+        # Clean up temporary directory
+        if temp_dir and Path(temp_dir).exists():
+            try:
+                shutil.rmtree(temp_dir)
+                log(f"Cleaned up temporary directory: {temp_dir}")
+            except Exception as cleanup_error:
+                log(f"Failed to clean up temporary directory: {cleanup_error}")
+    
+    log(f"Processed {len(docs)} documents from {len(uploaded_files)} uploaded files")
+    if len(docs) == 0:
+        st.warning("No documents could be processed from the uploaded files. Please check the file formats and content.")
+    return docs
 
-@st.cache_resource(show_spinner=False)
-def get_index():
-    with st.spinner("Parsing & indexing documents…"):
-        docs = load_documents("data")
-        if DEBUG:
-            print(f"Loaded documents: {docs}")
-        return build_index(docs, embed_model=_get_embed_model())
+def load_documents_from_session():
+    """Load documents from session state (uploaded files)."""
+    if st.session_state.use_uploaded and st.session_state.uploaded_docs:
+        return st.session_state.uploaded_docs
+    else:
+        return []
 
 def is_installed(pkg):
     try:
@@ -93,42 +170,123 @@ def available_llm_providers():
         providers.append("ollama")
     return providers
 
-# --- Utility: Get requirements from docs ---
+# --- Utility: Get requirements from uploaded docs ---
 def get_requirement_rows():
-    docs = load_documents("data")
+    docs = load_documents_from_session()
     requirement_rows = []
+    
+    if DEBUG:
+        log(f"get_requirement_rows: Processing {len(docs)} documents")
+        for i, doc in enumerate(docs):
+            log(f"  Document {i+1}: {doc.get('name', 'unknown')} ({len(doc.get('text', ''))} chars)")
+    
+    # Lazy import - only when needed
+    try:
+        from analysis.utils import split_into_requirements, is_requirement
+    except ImportError as e:
+        st.error(f"Failed to import analysis utilities: {e}")
+        return []
+    
     for doc in docs:
+        doc_requirements = []
         for req in split_into_requirements(doc["text"]):
             if is_requirement(req):
                 requirement_rows.append({
-                    "Source": doc.get("source") or doc.get("path", "unknown"),
+                    "Source": doc.get("source") or doc.get("name", "unknown"),
                     "Requirement": req,
                 })
+                doc_requirements.append(req)
+        
+        if DEBUG:
+            log(f"  Found {len(doc_requirements)} requirements in {doc.get('name', 'unknown')}")
+    
+    if DEBUG:
+        log(f"Total requirement_rows: {len(requirement_rows)}")
+    
     return requirement_rows
 
 # --- Cache normalized requirements for reuse across tabs ---
 @st.cache_data(show_spinner=True)
-def get_normalized_requirements():
+def get_normalized_requirements(_uploaded_docs_hash):
     requirement_rows = get_requirement_rows()
     requirement_chunks = [
         {"text": r["Requirement"], "source": r["Source"]}
         for r in requirement_rows
     ]
-    return normalize_requirements(requirement_chunks)
+    
+    if DEBUG:
+        log(f"get_normalized_requirements: Processing {len(requirement_chunks)} requirement chunks")
+        source_counts = {}
+        for chunk in requirement_chunks:
+            source = chunk["source"]
+            source_counts[source] = source_counts.get(source, 0) + 1
+        for source, count in source_counts.items():
+            log(f"  {source}: {count} requirements")
+    
+    # Lazy import - only when needed
+    try:
+        from analysis.normalize_requirements import normalize_requirements
+        result = normalize_requirements(requirement_chunks)
+        
+        if DEBUG:
+            log(f"get_normalized_requirements: Returned {len(result)} normalized requirements")
+            source_counts_result = {}
+            for r in result:
+                source = r["source"]
+                source_counts_result[source] = source_counts_result.get(source, 0) + 1
+            for source, count in source_counts_result.items():
+                log(f"  Normalized {source}: {count} requirements")
+        
+        return result
+    except ImportError as e:
+        st.error(f"Failed to import normalize_requirements: {e}")
+        return []
 
 @st.cache_data(show_spinner=True)
-def get_clarity_results():
-    results = get_normalized_requirements()
+def get_clarity_results(_uploaded_docs_hash):
+    results = get_normalized_requirements(_uploaded_docs_hash)
     clarity_rows = []
-    for r in results:
-        clarity = analyze_clarity(r["text"])
-        clarity_rows.append({
-            "Source": r["source"],
-            "Requirement": r["text"],
-            "ClarityScore": clarity["clarity_score"],
-            "Issues": clarity["issues"]
-        })
-    return clarity_rows
+    
+    # Lazy import - only when needed
+    try:
+        from analysis.heuristics import analyze_clarity
+        for r in results:
+            clarity = analyze_clarity(r["text"])
+            clarity_rows.append({
+                "Source": r["source"],
+                "Requirement": r["text"],
+                "ClarityScore": clarity["clarity_score"],
+                "Issues": clarity["issues"]
+            })
+        return clarity_rows
+    except ImportError as e:
+        st.error(f"Failed to import analyze_clarity: {e}")
+        return []
+
+def get_uploaded_docs_hash():
+    """Create a hash of uploaded documents to use for cache invalidation."""
+    if not st.session_state.uploaded_docs:
+        return "no_docs"
+    # Create a comprehensive hash based on document names, sizes, and content length
+    doc_info = []
+    for doc in st.session_state.uploaded_docs:
+        doc_info.append((
+            doc.get('name', ''),
+            doc.get('size', 0),
+            len(doc.get('text', '')),
+            hash(doc.get('text', '')[:100])  # Hash of first 100 chars for uniqueness
+        ))
+    
+    # Sort to ensure consistent hashing regardless of order
+    doc_info_sorted = sorted(doc_info)
+    result_hash = hash(str(doc_info_sorted))
+    
+    if DEBUG:
+        log(f"get_uploaded_docs_hash: Hash for {len(st.session_state.uploaded_docs)} docs = {result_hash}")
+        for i, info in enumerate(doc_info_sorted):
+            log(f"  Doc {i+1}: {info[0]} (size: {info[1]}, text_len: {info[2]})")
+    
+    return result_hash
 
 
 # Enhanced header section
@@ -149,83 +307,145 @@ if css_content:
     st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
 with st.sidebar:
-    # Sidebar Header - simplified
+    # Sidebar Header
     st.markdown("""
         <div class="sidebar-header">
-            <h2 class="sidebar-header-title">Filter Requirements</h2>
+            <h2 class="sidebar-header-title">Upload Documents</h2>
             <p class="sidebar-header-subtitle">
-                Filter and search requirements across all tabs
+                Upload and process requirement documents
             </p>
         </div>
     """, unsafe_allow_html=True)
     
-    # Search input section
-    st.markdown("**Enter keywords to filter requirements:**")
+    uploaded_files = st.file_uploader(
+        "Upload requirement documents",
+        type=['pdf', 'docx', 'doc', 'txt', 'md'],
+        accept_multiple_files=True,
+        help="Upload PDF, Word, text, or markdown files containing requirements",
+        label_visibility="collapsed",
+        key="document_uploader"
+    )
     
-    # Search input with enhanced styling
-    col1, col2 = st.columns([3.5, 1])
+    if uploaded_files and len(uploaded_files) > 0:
+        # Check for duplicate files
+        existing_doc_names = {doc['name'] for doc in st.session_state.uploaded_docs}
+        new_files = []
+        duplicate_files = []
+        
+        for file in uploaded_files:
+            if file.name in existing_doc_names:
+                duplicate_files.append(file.name)
+            else:
+                new_files.append(file)
+        
+        # Show files to be processed
+        if new_files:
+            st.write(f"**New files ready for processing ({len(new_files)}):**")
+            for file in new_files:
+                st.write(f"• {file.name} ({len(file.getvalue()):,} bytes)")
+            
+            if st.button("🚀 Process New Files", type="primary"):
+                try:
+                    with st.spinner("Processing new files..."):
+                        log(f"Starting to process {len(new_files)} new files")
+                        processed_docs = process_uploaded_files(new_files)
+                        
+                        if processed_docs:
+                            # Append to existing documents instead of replacing
+                            st.session_state.uploaded_docs.extend(processed_docs)
+                            st.session_state.use_uploaded = True
+                            
+                            # Explicitly clear caches to ensure fresh data
+                            get_normalized_requirements.clear()
+                            get_clarity_results.clear()
+                            
+                            log(f"Successfully processed {len(processed_docs)} documents, total now: {len(st.session_state.uploaded_docs)}")
+                            log("Cleared caches for fresh data")
+                            st.success(f"Successfully processed {len(processed_docs)} new documents!")
+                            if duplicate_files:
+                                st.info(f"Skipped {len(duplicate_files)} duplicate file(s)")
+                            st.rerun()
+                        else:
+                            log("No documents were processed successfully")
+                            st.error("No new documents were processed successfully")
+                            
+                except Exception as e:
+                    error_msg = f"Error processing files: {e}"
+                    log(error_msg)
+                    st.error(error_msg)
+                    import traceback
+                    log(f"Full traceback: {traceback.format_exc()}")
+        else:
+            if duplicate_files:
+                st.info("All selected files are already uploaded. No new files to process.")
+            else:
+                st.write("No files selected for processing.")
     
-    # Get or initialize search instance counter
-    search_instance = st.session_state.get('search_instance', 0)
-    
-    with col1:
-        search_query = st.text_input(
-            "Filter all requirements:",
-            placeholder="e.g., performance, security, user...",
-            key=f"unified_search_{search_instance}",
-            label_visibility="collapsed",
-            help="Enter keywords to filter requirements across all tabs"
-        )
-    with col2:
-        if st.button("🗑️", key="clear_unified_search", help="Clear filter"):
-            # Increment search instance to create a new text input widget
-            st.session_state['search_instance'] = st.session_state.get('search_instance', 0) + 1
-            # Clear any old search states
-            keys_to_clear = [k for k in st.session_state.keys() if k.startswith('unified_search_')]
-            for key in keys_to_clear:
-                del st.session_state[key]
-            st.rerun()
-    
-    # Search status with enhanced styling
-    if search_query:
-        st.markdown(f"""
-            <div class="search-stats">
-                <strong>&#128269; Active Search:</strong><br>
-                <em>"{search_query}"</em>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-            <div class="filter-stats">
-                <strong>🔵 Showing all requirements</strong>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    # Document information - showing only file names
+    # Document information
     st.markdown("---")
     st.markdown("**📄 Documents Loaded:**")
     
-    # Show only document names
-    try:
-        docs = load_documents("data")
-        if docs:
-            doc_names = []
-            for doc in docs:
-                source = doc.get("source", "") or doc.get("path", "")
-                if source:
-                    # Remove "data/" prefix if present
-                    doc_name = source.replace("data/", "") if source.startswith("data/") else source
-                    doc_names.append(doc_name)
-            
-            if doc_names:
-                for name in sorted(doc_names):
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {name}", unsafe_allow_html=True)
-            else:
-                st.markdown("*No document names found*")
+    if st.session_state.uploaded_docs:
+        for doc in st.session_state.uploaded_docs:
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {doc['name']}", unsafe_allow_html=True)
+        
+        if st.button("📁 Clear Uploaded Files"):
+            st.session_state.uploaded_docs = []
+            st.session_state.use_uploaded = False
+            # Clear all related caches
+            get_normalized_requirements.clear()
+            get_clarity_results.clear()
+            log("Cleared all uploaded files and caches")
+            st.rerun()
+    else:
+        st.info("No documents uploaded yet.")
+    
+    # Search functionality - only show if documents are loaded
+    if st.session_state.uploaded_docs:
+        st.markdown("---")
+        st.markdown("**🔍 Filter Requirements:**")
+        
+        # Search input section
+        st.markdown("Enter keywords to filter requirements:")
+        
+        # Search input with enhanced styling
+        col1, col2 = st.columns([3.5, 1])
+        
+        # Get or initialize search instance counter
+        search_instance = st.session_state.get('search_instance', 0)
+        
+        with col1:
+            search_query = st.text_input(
+                "Filter all requirements:",
+                placeholder="e.g., performance, security, user...",
+                key=f"unified_search_{search_instance}",
+                label_visibility="collapsed",
+                help="Enter keywords to filter requirements across all tabs"
+            )
+        with col2:
+            if st.button("🗑️", key="clear_unified_search", help="Clear filter"):
+                # Increment search instance to create a new text input widget
+                st.session_state['search_instance'] = st.session_state.get('search_instance', 0) + 1
+                # Clear any old search states
+                keys_to_clear = [k for k in st.session_state.keys() if k.startswith('unified_search_')]
+                for key in keys_to_clear:
+                    del st.session_state[key]
+                st.rerun()
+        
+        # Search status with enhanced styling
+        if search_query:
+            st.markdown(f"""
+                <div class="search-stats">
+                    <strong>&#128269; Active Search:</strong><br>
+                    <em>"{search_query}"</em>
+                </div>
+            """, unsafe_allow_html=True)
         else:
-            st.markdown("*No documents loaded*")
-    except Exception as e:
-        st.markdown(f"*Error loading documents: {str(e)}*")
+            st.markdown("""
+                <div class="filter-stats">
+                    <strong>🔵 Showing all requirements</strong>
+                </div>
+            """, unsafe_allow_html=True)
 
 # Define the unified search query for all tabs to use
 search_instance = st.session_state.get('search_instance', 0)
@@ -276,33 +496,67 @@ def show_sources(sources):
                 st.write("•", src)
 
 with tab_search:
+    if not st.session_state.uploaded_docs:
+        st.info("Please upload documents using the sidebar to start searching and analyzing requirements.")
+        st.markdown("""
+            **Getting Started:**
+            1. Use the sidebar to upload requirement documents (PDF, Word, text files)
+            2. Click "Process Uploaded Files" to extract text
+            3. Once processed, you can search, analyze quality, and generate tests
+        """)
+        st.stop()
+    
     llm_options = available_llm_providers()
     if not llm_options:
         st.warning("No LLM providers available. Please check your environment variables and dependencies.")
-
-    index = get_index()
-    if index is None:
-        st.error("Failed to build the document index. Please check your embedding model, input data, and logs for errors.")
-        if DEBUG:
-            print("Failed to build the document index. Please check your embedding model, input data, and logs for errors.")
         st.stop()
 
+    # Lazy imports for QA functionality
     try:
-        retriever = index.as_retriever(search_kwargs={"k": 4})
-        if DEBUG:
-            print(f"Retriever created: {retriever}")
-    except Exception as e:
-        st.error(f"Failed to create retriever: {e}")
-        if DEBUG:
-            print(f"Failed to create retriever: {e}")
-        st.stop()
+        from ingestion.loader import load_documents
+        from analysis.index import build_index
+        from analysis.qa import make_qa
+        
+        # Build index from uploaded documents
+        @st.cache_resource(show_spinner=False)
+        def get_index_from_uploaded():
+            with st.spinner("Indexing uploaded documents…"):
+                docs = load_documents_from_session()
+                if DEBUG:
+                    print(f"Loaded uploaded documents: {len(docs)} documents")
+                if not docs:
+                    return None
+                embed_model = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+                return build_index(docs, embed_model=embed_model)
+        
+        index = get_index_from_uploaded()
+        if index is None:
+            st.error("Failed to build the document index. Please check your uploaded documents.")
+            if DEBUG:
+                print("Failed to build the document index from uploaded documents.")
+            st.stop()
 
-    qa = make_qa(retriever)
-    if DEBUG:
-        print(f"QA chain created: {qa}")
-    if qa is None:
-        st.error("QA chain was not created. Please check your retriever and LLM setup.")
-        print("QA chain was not created. Please check your retriever and LLM setup.")
+        try:
+            retriever = index.as_retriever(search_kwargs={"k": 4})
+            if DEBUG:
+                print(f"Retriever created: {retriever}")
+        except Exception as e:
+            st.error(f"Failed to create retriever: {e}")
+            if DEBUG:
+                print(f"Failed to create retriever: {e}")
+            st.stop()
+
+        qa = make_qa(retriever)
+        if DEBUG:
+            print(f"QA chain created: {qa}")
+        if qa is None:
+            st.error("QA chain was not created. Please check your retriever and LLM setup.")
+            print("QA chain was not created. Please check your retriever and LLM setup.")
+            st.stop()
+            
+    except ImportError as e:
+        st.error(f"Required analysis modules not available: {e}")
+        st.info("Some search functionality requires additional dependencies.")
         st.stop()
 
     # Search interface anchor
@@ -445,12 +699,27 @@ with tab_search:
             st.text(tb)
 
 with tab_summaries_traceability:
+    if not st.session_state.uploaded_docs:
+        st.info("Please upload and process documents to view summaries and traceability information.")
+        st.stop()
+        
     # Create sub-tabs for Summaries and Traceability
     subtab_summaries, subtab_traceability = st.tabs(["Summaries", "Traceability"])
     
     with subtab_summaries:
         try:
-            results = get_normalized_requirements()
+            docs_hash = get_uploaded_docs_hash()
+            results = get_normalized_requirements(docs_hash)
+            
+            if DEBUG:
+                log(f"Summaries tab: Got {len(results)} normalized requirements")
+                source_counts = {}
+                for r in results:
+                    source = r["source"]
+                    source_counts[source] = source_counts.get(source, 0) + 1
+                for source, count in source_counts.items():
+                    log(f"  Summaries tab {source}: {count} requirements")
+            
             if results:
                 # Filter results based on search query
                 filtered_results = results
@@ -503,11 +772,16 @@ with tab_summaries_traceability:
             st.error(f"Failed to process requirements: {e}")
 
 with tab_quality:
+    if not st.session_state.uploaded_docs:
+        st.info("Please upload and process documents to analyze requirements quality.")
+        st.stop()
+        
     # Add anchor for back to top functionality
     st.markdown('<div id="quality-top"></div>', unsafe_allow_html=True)
     
     try:
-        requirement_rows = get_clarity_results()
+        docs_hash = get_uploaded_docs_hash()
+        requirement_rows = get_clarity_results(docs_hash)
         if not requirement_rows:
             st.info("No requirements detected.")
             st.stop()
@@ -518,7 +792,8 @@ with tab_quality:
             filtered_requirement_rows = []
             
             # Get the original normalized data for more comprehensive search
-            normalized_results = get_normalized_requirements()
+            docs_hash = get_uploaded_docs_hash()
+            normalized_results = get_normalized_requirements(docs_hash)
             
             for r in requirement_rows:
                 # Find the corresponding normalized data for this requirement
@@ -545,7 +820,12 @@ with tab_quality:
                 st.info(f"Found {len(requirement_rows)} requirement(s) matching '{search_quality}'")
 
         # Calculate dependencies once for all subtabs
-        missing_refs, circular_refs = analyze_dependencies(requirement_rows)
+        try:
+            from analysis.utils import analyze_dependencies
+            missing_refs, circular_refs = analyze_dependencies(requirement_rows)
+        except ImportError as e:
+            st.error(f"Failed to import dependency analysis: {e}")
+            missing_refs, circular_refs = [], []
 
         # Create sub-tabs for the Quality tab
         subtab_analysis, subtab_dependency = st.tabs(
@@ -618,7 +898,7 @@ with tab_quality:
                     # Show status badge and main issues only
                     if r["ClarityScore"] == 100:
                         st.markdown(
-                            '<span class="status-good">✅ No issues detected</span>',
+                            '<span class="status-good">No issues detected</span>',
                             unsafe_allow_html=True
                         )
                     else:
@@ -646,8 +926,12 @@ with tab_quality:
                                     )
                                     st.info("This is not resolvable by AI. You must fill in the blank.")
                                 with st.spinner("Proposing rewrite…"):
-                                    rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
-                                st.session_state[rewrite_state_key] = rewrite
+                                    try:
+                                        from analysis.rewrites import suggest_rewrites
+                                        rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
+                                        st.session_state[rewrite_state_key] = rewrite
+                                    except ImportError as e:
+                                        st.error(f"Failed to import rewrite functionality: {e}")
 
                             if rewrite_state_key in st.session_state:
                                 st.markdown("#### ✏️ <span style='color:#0072B2'>Rewrite</span>", unsafe_allow_html=True)
@@ -687,7 +971,7 @@ with tab_quality:
                         <div class="status-card status-warning">
                             <div style="display: flex; align-items: flex-start;">
                                 <div class="status-icon" style="background-color: #fef3c7; color: #d97706;">
-                                    ⚠️
+                                    WARNING
                                 </div>
                                 <div style="flex: 1;">
                                     <h3 class="section-title" style="color: #d97706;">
@@ -700,7 +984,7 @@ with tab_quality:
                                         {''.join([f'<div class="ref-item"><span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600;">REF</span><code style="color: #92400e; font-weight: 600;">{ref}</code></div>' for ref in sorted(missing_refs)])}
                                     </div>
                                     <p style="margin: 0.75rem 0 0 0; color: #92400e; font-size: 0.9rem; font-style: italic;">
-                                        💡 <strong>Recommendation:</strong> Verify these requirement IDs exist or update the references.
+                                        <strong>Recommendation:</strong> Verify these requirement IDs exist or update the references.
                                     </p>
                                 </div>
                             </div>
@@ -713,7 +997,7 @@ with tab_quality:
                         <div class="status-card status-success">
                             <div style="display: flex; align-items: center;">
                                 <div class="status-icon" style="background-color: #dcfce7; color: #16a34a;">
-                                    ✅
+                                    OK
                                 </div>
                                 <div>
                                     <h3 class="section-title" style="color: #16a34a;">
@@ -734,7 +1018,7 @@ with tab_quality:
                         <div class="status-card status-error">
                             <div style="display: flex; align-items: flex-start;">
                                 <div class="status-icon" style="background-color: #fee2e2; color: #dc2626;">
-                                    🚨
+                                    ERROR
                                 </div>
                                 <div style="flex: 1;">
                                     <h3 class="section-title" style="color: #dc2626;">
@@ -747,7 +1031,7 @@ with tab_quality:
                                         {''.join([f'<div class="ref-item"><span style="background: #dc2626; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600;">CIRCULAR</span><strong style="color: #dc2626;">{a}</strong> <span style="color: #6b7280;">↔</span> <strong style="color: #dc2626;">{b}</strong></div>' for a, b in circular_refs])}
                                     </div>
                                     <p style="margin: 0.75rem 0 0 0; color: #dc2626; font-size: 0.9rem; font-style: italic;">
-                                        💡 <strong>Critical:</strong> Review these requirements immediately to break the circular dependency chain.
+                                        <strong>Critical:</strong> Review these requirements immediately to break the circular dependency chain.
                                     </p>
                                 </div>
                             </div>
@@ -760,7 +1044,7 @@ with tab_quality:
                         <div class="status-card status-success">
                             <div style="display: flex; align-items: center;">
                                 <div class="status-icon" style="background-color: #dcfce7; color: #16a34a;">
-                                    ✅
+                                    OK
                                 </div>
                                 <div>
                                     <h3 class="section-title" style="color: #16a34a;">
@@ -790,7 +1074,12 @@ def render_compact_test_card(requirement, clarity_score, status):
             st.caption(f"Score: {score_text}")
         
         # Generate and show test scenarios in compact format
-        ideas = generate_test_ideas(requirement["Requirement"])
+        try:
+            from analysis.testgen import generate_test_ideas
+            ideas = generate_test_ideas(requirement["Requirement"])
+        except ImportError as e:
+            st.error(f"Test generation not available: {e}")
+            return
         
         with st.expander(f"{len(ideas['ideas'])} test scenario(s)", expanded=False):
             for i, idea in enumerate(ideas['ideas'][:3]):  # Limit to 3 for space
@@ -840,17 +1129,21 @@ def render_compact_test_card(requirement, clarity_score, status):
         
         # Compact export status
         if status == 'blocked':
-            st.caption("🚫 Export disabled")
+            st.caption("Export disabled")
         elif status == 'provisional':
             confirm_key = f"confirm_prov_{abs(hash(requirement['Requirement']))}"
-            st.checkbox('✓ Confirm for export', key=confirm_key, help="Confirm export for provisional item")
+            st.checkbox('Confirm for export', key=confirm_key, help="Confirm export for provisional item")
         else:
-            st.caption("✅ Ready for export")
+            st.caption("Ready for export")
         
         st.divider()
 
 st.divider()
 with tab_tests:
+    if not st.session_state.uploaded_docs:
+        st.info("Please upload and process documents to generate test scenarios.")
+        st.stop()
+        
     try:
         requirement_rows = get_requirement_rows()
         if not requirement_rows:
@@ -863,7 +1156,8 @@ with tab_tests:
             filtered_requirement_rows = []
             
             # Get the original normalized data for more comprehensive search
-            normalized_results = get_normalized_requirements()
+            docs_hash = get_uploaded_docs_hash()
+            normalized_results = get_normalized_requirements(docs_hash)
             
             for r in requirement_rows:
                 # Find the corresponding normalized data for this requirement
@@ -890,7 +1184,8 @@ with tab_tests:
                 st.info(f"Found {len(requirement_rows)} requirement(s) matching '{search_tests}'")
 
         # Precompute clarity lookup to gate test exports and UI
-        clarity_rows = get_clarity_results()
+        docs_hash = get_uploaded_docs_hash()
+        clarity_rows = get_clarity_results(docs_hash)
         clarity_map = { (c["Requirement"], c["Source"]): c for c in clarity_rows }
 
         # Status-based organization for space efficiency
@@ -934,6 +1229,12 @@ with tab_tests:
         
         # Single download button for all test scenarios
         if st.button("Download Test Scenarios", type="primary", help="Download test scenarios for all visible requirements"):
+            try:
+                from analysis.testgen import generate_test_ideas
+            except ImportError as e:
+                st.error(f"Test generation not available: {e}")
+                st.stop()
+                
             with st.spinner("Generating test scenarios..."):
                 all_export_rows = []
                 
@@ -1021,7 +1322,7 @@ with tab_tests:
                 if all_export_rows:
                     out_df = pd.DataFrame(all_export_rows)
                     csv_bytes = out_df.to_csv(index=False).encode('utf-8')
-                    st.success(f"✅ Generated {len(all_export_rows)} test scenarios!")
+                    st.success(f"Generated {len(all_export_rows)} test scenarios!")
                     st.download_button('⬇️ Click to Download CSV', 
                                      data=csv_bytes, 
                                      file_name="all_test_scenarios.csv", 
@@ -1033,11 +1334,11 @@ with tab_tests:
         # Dynamic column layout based on visible sections
         visible_sections = []
         if show_ready and ready_reqs:
-            visible_sections.append(("ready", ready_reqs, "✅ Ready"))
+            visible_sections.append(("ready", ready_reqs, "Ready"))
         if show_provisional and provisional_reqs:
-            visible_sections.append(("provisional", provisional_reqs, "🟡 Provisional"))
+            visible_sections.append(("provisional", provisional_reqs, "Provisional"))
         if show_blocked and blocked_reqs:
-            visible_sections.append(("blocked", blocked_reqs, "🚩 Blocked"))
+            visible_sections.append(("blocked", blocked_reqs, "Blocked"))
         
         if not visible_sections:
             st.info("No sections selected or no requirements match the current criteria.")
@@ -1064,9 +1365,12 @@ with tab_tests:
         st.error(f"Failed to generate test scenarios: {e}")
 
     with subtab_traceability:
-        st.markdown("## 📊 Traceability Matrix")
+        st.markdown("## Traceability Matrix")
         
         try:
+            # Lazy import for traceability
+            from analysis.traceability import build_trace_matrix
+            
             requirement_rows = get_requirement_rows()
             if not requirement_rows:
                 st.info("No requirements detected.")
@@ -1078,7 +1382,8 @@ with tab_tests:
                 filtered_requirement_rows = []
                 
                 # Get the original normalized data for more comprehensive search
-                normalized_results = get_normalized_requirements()
+                docs_hash = get_uploaded_docs_hash()
+                normalized_results = get_normalized_requirements(docs_hash)
                 
                 for r in requirement_rows:
                     # Find the corresponding normalized data for this requirement
@@ -1155,14 +1460,19 @@ with tab_tests:
             st.error(f"Failed to generate traceability matrix: {e}")
 
 with tab_dashboard:
-    st.markdown("## 📊 Requirements Dashboard")
+    if not st.session_state.uploaded_docs:
+        st.info("Please upload and process documents to view the requirements dashboard.")
+        st.stop()
+        
+    st.markdown("## Requirements Dashboard")
     
     try:
-        results = get_normalized_requirements()
+        docs_hash = get_uploaded_docs_hash()
+        results = get_normalized_requirements(docs_hash)
         total_reqs = len(results) if results else 0
         
         if total_reqs == 0:
-            st.warning("⚠️ No requirements data available. Please load requirements in the Search tab first.")
+            st.warning("No requirements data available. Please load requirements in the Search tab first.")
         else:
             # === KPI CARDS ROW ===
             col1, col2, col3, col4, col5 = st.columns(5)
@@ -1175,7 +1485,8 @@ with tab_dashboard:
                 )
             
             # Calculate clarity metrics
-            clarity_rows = get_clarity_results()
+            docs_hash = get_uploaded_docs_hash()
+            clarity_rows = get_clarity_results(docs_hash)
             issue_counts = {"TBD": 0, "Ambiguous": 0, "NonVerifiable": 0, "PassiveVoice": 0}
             clarity_scores = []
             
@@ -1201,7 +1512,7 @@ with tab_dashboard:
             with col3:
                 tbd_pct = 100 * issue_counts['TBD'] / total_reqs if total_reqs else 0
                 st.metric(
-                    label="🚨 TBD Issues", 
+                    label="TBD Issues", 
                     value=f"{tbd_pct:.1f}%",
                     help="Percentage of requirements with TBD (To Be Determined) content"
                 )
@@ -1209,7 +1520,7 @@ with tab_dashboard:
             with col4:
                 ambiguous_pct = 100 * issue_counts['Ambiguous'] / total_reqs if total_reqs else 0
                 st.metric(
-                    label="⚠️ Ambiguous", 
+                    label="Ambiguous", 
                     value=f"{ambiguous_pct:.1f}%",
                     help="Percentage of requirements with ambiguous language"
                 )
@@ -1226,7 +1537,7 @@ with tab_dashboard:
             
             with col5:
                 st.metric(
-                    label="✅ Test Coverage", 
+                    label="Test Coverage", 
                     value=f"{coverage_pct:.1f}%",
                     help="Percentage of system requirements covered by tests"
                 )
@@ -1234,7 +1545,7 @@ with tab_dashboard:
             st.markdown("---")
             
             # === COVERAGE VISUALIZATION BAR ===
-            st.markdown("### 📊 Test Coverage Overview")
+            st.markdown("### Test Coverage Overview")
             
             if len(sys_rows) > 0:
                 covered_count = len(sys_covered)
@@ -1262,7 +1573,7 @@ with tab_dashboard:
                 # Coverage breakdown chart
                 st.bar_chart(coverage_data.set_index('Status')['Count'])
             else:
-                st.info("💡 No system requirements found for coverage analysis")
+                st.info("No system requirements found for coverage analysis")
             
             st.markdown("---")
             
@@ -1271,7 +1582,7 @@ with tab_dashboard:
             
             # Left chart: Quality Issues Distribution
             with chart_col1:
-                st.markdown("### 🔍 Quality Issues Distribution")
+                st.markdown("### Quality Issues Distribution")
                 
                 if any(count > 0 for count in issue_counts.values()):
                     issue_data = pd.DataFrame({
@@ -1296,11 +1607,11 @@ with tab_dashboard:
                     for _, row in issue_data.iterrows():
                         st.caption(f"• {row['Issue Type']}: {row['Count']} ({row['Percentage']:.1f}%)")
                 else:
-                    st.success("🎉 No quality issues detected!")
+                    st.success("No quality issues detected!")
             
             # Right chart: Requirement Types Distribution  
             with chart_col2:
-                st.markdown("### 📋 Requirement Types Distribution")
+                st.markdown("### Requirement Types Distribution")
                 
                 all_categories = [cat for r in results for cat in r.get("categories", [])]
                 if all_categories:
@@ -1321,31 +1632,31 @@ with tab_dashboard:
                                 pct = 100 * count / total_reqs
                                 st.caption(f"• {cat_type}: {count} ({pct:.1f}%)")
                 else:
-                    st.info("💡 No requirement type categories available")
+                    st.info("No requirement type categories available")
             
             # === SUMMARY INSIGHTS ===
             st.markdown("---")
-            st.markdown("### 💡 Key Insights")
+            st.markdown("### Key Insights")
             
             insights = []
             
             if avg_clarity < 5:
-                insights.append("🚨 **Low clarity scores** - Consider reviewing requirement definitions")
+                insights.append("**Low clarity scores** - Consider reviewing requirement definitions")
             elif avg_clarity > 7:
                 insights.append("**Good clarity scores** - Requirements are well-defined")
                 
             if tbd_pct > 20:
                 insights.append("**High TBD content** - Many requirements need further definition")
             elif tbd_pct == 0:
-                insights.append("✅ **No TBD content** - All requirements are fully defined")
+                insights.append("**No TBD content** - All requirements are fully defined")
                 
             if coverage_pct < 50:
                 insights.append("**Low test coverage** - Consider adding more test scenarios")
             elif coverage_pct > 80:
-                insights.append("🎯 **Excellent test coverage** - Most requirements are tested")
+                insights.append("**Excellent test coverage** - Most requirements are tested")
                 
             if len(insights) == 0:
-                insights.append("📊 **Good overall status** - Requirements are in decent shape")
+                insights.append("**Good overall status** - Requirements are in decent shape")
             
             for insight in insights:
                 st.markdown(insight)
