@@ -62,44 +62,44 @@ def process_uploaded_files(uploaded_files):
         log(f"Failed to import unstructured: {e}")
         st.error("Required library 'unstructured' not available. Please check your installation.")
         return []
-    
+
     if not uploaded_files:
         log("No uploaded files provided to process_uploaded_files")
         return []
-    
+
     docs = []
     temp_dir = None
-    
+
     try:
         temp_dir = tempfile.mkdtemp()
         log(f"Created temporary directory: {temp_dir}")
-        
+
         for i, uploaded_file in enumerate(uploaded_files):
             try:
                 log(f"Processing file {i+1}/{len(uploaded_files)}: {uploaded_file.name}")
-                
+
                 # Validate file object
                 if not hasattr(uploaded_file, 'name') or not hasattr(uploaded_file, 'getvalue'):
                     log(f"Invalid file object: {uploaded_file}")
                     continue
-                
+
                 # Save uploaded file to temporary location
                 temp_file_path = Path(temp_dir) / uploaded_file.name
                 file_content = uploaded_file.getvalue()
-                
+
                 if len(file_content) == 0:
                     log(f"File {uploaded_file.name} is empty, skipping")
                     continue
-                
+
                 with open(temp_file_path, "wb") as f:
                     f.write(file_content)
                 log(f"Saved uploaded file to: {temp_file_path} (size: {len(file_content)} bytes)")
-                
+
                 # Process the file
                 try:
                     elements = partition(filename=str(temp_file_path))
                     log(f"Partitioned file {uploaded_file.name}, got {len(elements)} elements")
-                    
+
                     text = "\n".join([getattr(el, "text", "") for el in elements if getattr(el, "text", "")])
                     if text.strip():
                         docs.append({
@@ -118,13 +118,13 @@ def process_uploaded_files(uploaded_files):
                     log(error_msg)
                     st.warning(error_msg)
                     continue
-                    
+
             except Exception as file_error:
                 error_msg = f"Error processing file {uploaded_file.name}: {file_error}"
                 log(error_msg)
                 st.warning(error_msg)
                 continue
-                
+
     except Exception as e:
         error_msg = f"Error setting up temporary directory: {e}"
         log(error_msg)
@@ -138,7 +138,7 @@ def process_uploaded_files(uploaded_files):
                 log(f"Cleaned up temporary directory: {temp_dir}")
             except Exception as cleanup_error:
                 log(f"Failed to clean up temporary directory: {cleanup_error}")
-    
+
     log(f"Processed {len(docs)} documents from {len(uploaded_files)} uploaded files")
     if len(docs) == 0:
         st.warning("No documents could be processed from the uploaded files. Please check the file formats and content.")
@@ -174,19 +174,19 @@ def available_llm_providers():
 def get_requirement_rows():
     docs = load_documents_from_session()
     requirement_rows = []
-    
+
     if DEBUG:
         log(f"get_requirement_rows: Processing {len(docs)} documents")
         for i, doc in enumerate(docs):
             log(f"  Document {i+1}: {doc.get('name', 'unknown')} ({len(doc.get('text', ''))} chars)")
-    
+
     # Lazy import - only when needed
     try:
         from analysis.utils import split_into_requirements, is_requirement
     except ImportError as e:
         st.error(f"Failed to import analysis utilities: {e}")
         return []
-    
+
     for doc in docs:
         doc_requirements = []
         for req in split_into_requirements(doc["text"]):
@@ -196,13 +196,13 @@ def get_requirement_rows():
                     "Requirement": req,
                 })
                 doc_requirements.append(req)
-        
+
         if DEBUG:
             log(f"  Found {len(doc_requirements)} requirements in {doc.get('name', 'unknown')}")
-    
+
     if DEBUG:
         log(f"Total requirement_rows: {len(requirement_rows)}")
-    
+
     return requirement_rows
 
 # --- Cache normalized requirements for reuse across tabs ---
@@ -213,7 +213,7 @@ def get_normalized_requirements(_uploaded_docs_hash):
         {"text": r["Requirement"], "source": r["Source"]}
         for r in requirement_rows
     ]
-    
+
     if DEBUG:
         log(f"get_normalized_requirements: Processing {len(requirement_chunks)} requirement chunks")
         source_counts = {}
@@ -222,12 +222,12 @@ def get_normalized_requirements(_uploaded_docs_hash):
             source_counts[source] = source_counts.get(source, 0) + 1
         for source, count in source_counts.items():
             log(f"  {source}: {count} requirements")
-    
+
     # Lazy import - only when needed
     try:
         from analysis.normalize_requirements import normalize_requirements
         result = normalize_requirements(requirement_chunks)
-        
+
         if DEBUG:
             log(f"get_normalized_requirements: Returned {len(result)} normalized requirements")
             source_counts_result = {}
@@ -236,7 +236,7 @@ def get_normalized_requirements(_uploaded_docs_hash):
                 source_counts_result[source] = source_counts_result.get(source, 0) + 1
             for source, count in source_counts_result.items():
                 log(f"  Normalized {source}: {count} requirements")
-        
+
         return result
     except ImportError as e:
         st.error(f"Failed to import normalize_requirements: {e}")
@@ -246,7 +246,7 @@ def get_normalized_requirements(_uploaded_docs_hash):
 def get_clarity_results(_uploaded_docs_hash):
     results = get_normalized_requirements(_uploaded_docs_hash)
     clarity_rows = []
-    
+
     # Lazy import - only when needed
     try:
         from analysis.heuristics import analyze_clarity
@@ -276,16 +276,16 @@ def get_uploaded_docs_hash():
             len(doc.get('text', '')),
             hash(doc.get('text', '')[:100])  # Hash of first 100 chars for uniqueness
         ))
-    
+
     # Sort to ensure consistent hashing regardless of order
     doc_info_sorted = sorted(doc_info)
     result_hash = hash(str(doc_info_sorted))
-    
+
     if DEBUG:
         log(f"get_uploaded_docs_hash: Hash for {len(st.session_state.uploaded_docs)} docs = {result_hash}")
         for i, info in enumerate(doc_info_sorted):
             log(f"  Doc {i+1}: {info[0]} (size: {info[1]}, text_len: {info[2]})")
-    
+
     return result_hash
 
 
@@ -310,55 +310,74 @@ with st.sidebar:
     # Sidebar Header
     st.markdown("""
         <div class="sidebar-header">
-            <h2 class="sidebar-header-title">Upload Documents</h2>
+            <h2 class="sidebar-header-title">Document Manager</h2>
             <p class="sidebar-header-subtitle">
-                Upload and process requirement documents
+                Upload and manage requirement documents
             </p>
         </div>
     """, unsafe_allow_html=True)
-    
+
+    # File upload section with professional styling
+    st.markdown('<div class="upload-section">', unsafe_allow_html=True)
     uploaded_files = st.file_uploader(
         "Upload requirement documents",
         type=['pdf', 'docx', 'doc', 'txt', 'md'],
         accept_multiple_files=True,
-        help="Upload PDF, Word, text, or markdown files containing requirements",
+        help="Supported formats: PDF, Word, text, and markdown files",
         label_visibility="collapsed",
         key="document_uploader"
     )
-    
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if uploaded_files and len(uploaded_files) > 0:
         # Check for duplicate files
         existing_doc_names = {doc['name'] for doc in st.session_state.uploaded_docs}
         new_files = []
         duplicate_files = []
-        
+
         for file in uploaded_files:
             if file.name in existing_doc_names:
                 duplicate_files.append(file.name)
             else:
                 new_files.append(file)
-        
+
         # Show files to be processed
         if new_files:
-            st.write(f"**New files ready for processing ({len(new_files)}):**")
+            st.markdown("---")
+            st.markdown('<div class="files-ready-section">', unsafe_allow_html=True)
+            st.markdown('<h3 class="section-header">Files Ready for Processing:</h3>', unsafe_allow_html=True)
             for file in new_files:
-                st.write(f"• {file.name} ({len(file.getvalue()):,} bytes)")
-            
-            if st.button("🚀 Process New Files", type="primary"):
+                file_size = len(file.getvalue())
+                if file_size < 1024:
+                    size_str = f"{file_size} B"
+                elif file_size < 1024 * 1024:
+                    size_str = f"{file_size / 1024:.1f} KB"
+                else:
+                    size_str = f"{file_size / (1024 * 1024):.1f} MB"
+
+                st.markdown(f"""
+                    <div class="file-item">
+                        <div class="file-name">{file.name}</div>
+                        <div class="file-size">{size_str}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if st.button("Process Files", type="primary", use_container_width=True):
                 try:
                     with st.spinner("Processing new files..."):
                         log(f"Starting to process {len(new_files)} new files")
                         processed_docs = process_uploaded_files(new_files)
-                        
+
                         if processed_docs:
                             # Append to existing documents instead of replacing
                             st.session_state.uploaded_docs.extend(processed_docs)
                             st.session_state.use_uploaded = True
-                            
+
                             # Explicitly clear caches to ensure fresh data
                             get_normalized_requirements.clear()
                             get_clarity_results.clear()
-                            
+
                             log(f"Successfully processed {len(processed_docs)} documents, total now: {len(st.session_state.uploaded_docs)}")
                             log("Cleared caches for fresh data")
                             st.success(f"Successfully processed {len(processed_docs)} new documents!")
@@ -368,7 +387,7 @@ with st.sidebar:
                         else:
                             log("No documents were processed successfully")
                             st.error("No new documents were processed successfully")
-                            
+
                 except Exception as e:
                     error_msg = f"Error processing files: {e}"
                     log(error_msg)
@@ -380,16 +399,40 @@ with st.sidebar:
                 st.info("All selected files are already uploaded. No new files to process.")
             else:
                 st.write("No files selected for processing.")
-    
-    # Document information
+
+    # Document management section
+    st.markdown('<div class="documents-section">', unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("**📄 Documents Loaded:**")
-    
+    st.markdown('<h3 class="section-header">Loaded Documents:</h3>', unsafe_allow_html=True)
+
     if st.session_state.uploaded_docs:
+        st.markdown('<div class="document-list">', unsafe_allow_html=True)
         for doc in st.session_state.uploaded_docs:
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {doc['name']}", unsafe_allow_html=True)
-        
-        if st.button("📁 Clear Uploaded Files"):
+            doc_text_length = len(doc.get('text', ''))
+            if doc_text_length < 1000:
+                size_class = "small"
+                size_desc = "Small"
+            elif doc_text_length < 5000:
+                size_class = "medium"
+                size_desc = "Medium"
+            else:
+                size_class = "large"
+                size_desc = "Large"
+
+            st.markdown(f"""
+                <div class="document-item {size_class}">
+                    <div class="doc-name">{doc['name']}</div>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Create a form-based clear button with blue styling
+        with st.form(key="clear_docs_form"):
+            clear_submitted = st.form_submit_button("Clear All Documents",
+                                                   help="Remove all uploaded documents",
+                                                   use_container_width=True)
+
+        if clear_submitted:
             st.session_state.uploaded_docs = []
             st.session_state.use_uploaded = False
             # Clear all related caches
@@ -397,23 +440,27 @@ with st.sidebar:
             get_clarity_results.clear()
             log("Cleared all uploaded files and caches")
             st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("No documents uploaded yet.")
-    
+        st.markdown('<div class="no-docs-message">No documents uploaded yet.</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
     # Search functionality - only show if documents are loaded
     if st.session_state.uploaded_docs:
         st.markdown("---")
-        st.markdown("**🔍 Filter Requirements:**")
-        
+        st.markdown('<h3 class="section-header">Filter Requirements:</h3>', unsafe_allow_html=True)
+
         # Search input section
         st.markdown("Enter keywords to filter requirements:")
-        
+
         # Search input with enhanced styling
         col1, col2 = st.columns([3.5, 1])
-        
+
         # Get or initialize search instance counter
         search_instance = st.session_state.get('search_instance', 0)
-        
+
         with col1:
             search_query = st.text_input(
                 "Filter all requirements:",
@@ -431,7 +478,7 @@ with st.sidebar:
                 for key in keys_to_clear:
                     del st.session_state[key]
                 st.rerun()
-        
+
         # Search status with enhanced styling
         if search_query:
             st.markdown(f"""
@@ -505,7 +552,7 @@ with tab_search:
             3. Once processed, you can search, analyze quality, and generate tests
         """)
         st.stop()
-    
+
     llm_options = available_llm_providers()
     if not llm_options:
         st.warning("No LLM providers available. Please check your environment variables and dependencies.")
@@ -516,7 +563,7 @@ with tab_search:
         from ingestion.loader import load_documents
         from analysis.index import build_index
         from analysis.qa import make_qa
-        
+
         # Build index from uploaded documents
         @st.cache_resource(show_spinner=False)
         def get_index_from_uploaded():
@@ -528,7 +575,7 @@ with tab_search:
                     return None
                 embed_model = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
                 return build_index(docs, embed_model=embed_model)
-        
+
         index = get_index_from_uploaded()
         if index is None:
             st.error("Failed to build the document index. Please check your uploaded documents.")
@@ -553,7 +600,7 @@ with tab_search:
             st.error("QA chain was not created. Please check your retriever and LLM setup.")
             print("QA chain was not created. Please check your retriever and LLM setup.")
             st.stop()
-            
+
     except ImportError as e:
         st.error(f"Required analysis modules not available: {e}")
         st.info("Some search functionality requires additional dependencies.")
@@ -561,14 +608,14 @@ with tab_search:
 
     # Search interface anchor
     st.markdown('<div id="search-input-section"></div>', unsafe_allow_html=True)
-    
+
     # Enhanced search interface with consolidated question section
     st.markdown("""
         <div class="content-card question-card">
             <h3 class="question-title">&#128172; Ask a Question</h3>
             <p class="question-subtitle">Ask anything about your requirements documents. I can help with analysis, dependencies, quality checks, and more.</p>
         </div>
-        
+
         <script>
             // Scroll to search input when Search tab is clicked
             setTimeout(function() {
@@ -581,15 +628,15 @@ with tab_search:
     """, unsafe_allow_html=True)
 
     col1, col2 = st.columns([3, 1])
-    
+
     with col1:
         query = st.text_input(
-            "Your question:", 
+            "Your question:",
             placeholder="e.g., What are the performance requirements? Which requirements have dependencies?",
             label_visibility="collapsed",
             key="search_tab_query"
         )
-    
+
     with col2:
         if st.button("🗑️ Clear", key="clear_search", help="Clear the search input", type="primary"):
             # Increment counter to create new text input with empty value
@@ -602,7 +649,7 @@ with tab_search:
             if "last_query" in st.session_state:
                 del st.session_state["last_query"]
             st.rerun()
-    
+
     # Get the current query value
     query = st.session_state.get("search_tab_query", "")
 
@@ -632,7 +679,7 @@ with tab_search:
                     for req in answer:
                         desc = req.get("description", "")
                         answer_list += f"- {desc}<br>"
-                    
+
                     st.markdown(f"""
                         <div class="content-card answer-card">
                             <h3 class="answer-title">&#129001; Answer</h3>
@@ -659,7 +706,7 @@ with tab_search:
                     if src not in seen:
                         unique_sources.append(src)
                         seen.add(src)
-                
+
                 # Create sources content
                 sources_content = ""
                 if len(unique_sources) > 3:
@@ -671,14 +718,14 @@ with tab_search:
                     for src in unique_sources:
                         if not src.startswith("data/"):
                             sources_content += f"<p>• {src}</p>"
-                
+
                 st.markdown(f"""
                     <div class="content-card sources-card">
                         <h3 class="sources-title">&#128196; Sources</h3>
                         {sources_content}
                     </div>
                 """, unsafe_allow_html=True)
-                
+
                 # Handle downloadable files separately if any exist
                 downloadable_sources = [src for src in unique_sources if src.startswith("data/") and os.path.exists(src)]
                 if downloadable_sources:
@@ -702,15 +749,15 @@ with tab_summaries_traceability:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to view summaries and traceability information.")
         st.stop()
-        
+
     # Create sub-tabs for Summaries and Traceability
     subtab_summaries, subtab_traceability = st.tabs(["Summaries", "Traceability"])
-    
+
     with subtab_summaries:
         try:
             docs_hash = get_uploaded_docs_hash()
             results = get_normalized_requirements(docs_hash)
-            
+
             if DEBUG:
                 log(f"Summaries tab: Got {len(results)} normalized requirements")
                 source_counts = {}
@@ -719,7 +766,7 @@ with tab_summaries_traceability:
                     source_counts[source] = source_counts.get(source, 0) + 1
                 for source, count in source_counts.items():
                     log(f"  Summaries tab {source}: {count} requirements")
-            
+
             if results:
                 # Filter results based on search query
                 filtered_results = results
@@ -730,7 +777,7 @@ with tab_summaries_traceability:
                         text_to_search = f"{r['text']} {r['normalized']} {' '.join(r['categories'])}".lower()
                         if all(term in text_to_search for term in search_terms):
                             filtered_results.append(r)
-                
+
                 if filtered_results:
                     df = pd.DataFrame([
                         {
@@ -741,11 +788,11 @@ with tab_summaries_traceability:
                         }
                         for r in filtered_results
                     ])
-                    
+
                     # Show search results count
                     if search_summaries:
                         st.info(f"Found {len(filtered_results)} requirement(s) matching '{search_summaries}'")
-                    
+
                     html_table = df.to_html(
                         classes="summaries-table",
                         index=False,
@@ -756,7 +803,7 @@ with tab_summaries_traceability:
                         f'<div class="summaries-table-container">{html_table}</div>',
                         unsafe_allow_html=True,
                     )
-                    
+
                     for r in filtered_results:
                         if DEBUG:
                             print("NORMALIZED FIELD:", repr(r["normalized"]))
@@ -775,10 +822,10 @@ with tab_quality:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to analyze requirements quality.")
         st.stop()
-        
+
     # Add anchor for back to top functionality
     st.markdown('<div id="quality-top"></div>', unsafe_allow_html=True)
-    
+
     try:
         docs_hash = get_uploaded_docs_hash()
         requirement_rows = get_clarity_results(docs_hash)
@@ -790,11 +837,11 @@ with tab_quality:
         if search_quality:
             search_terms = search_quality.lower().split()
             filtered_requirement_rows = []
-            
+
             # Get the original normalized data for more comprehensive search
             docs_hash = get_uploaded_docs_hash()
             normalized_results = get_normalized_requirements(docs_hash)
-            
+
             for r in requirement_rows:
                 # Find the corresponding normalized data for this requirement
                 normalized_data = None
@@ -802,17 +849,17 @@ with tab_quality:
                     if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
                         normalized_data = norm_r
                         break
-                
+
                 # Search in requirement text, source, normalized text, and categories
                 text_to_search = f"{r['Requirement']} {r['Source']}".lower()
                 if normalized_data:
                     text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
-                
+
                 if all(term in text_to_search for term in search_terms):
                     filtered_requirement_rows.append(r)
-            
+
             requirement_rows = filtered_requirement_rows
-            
+
             if not requirement_rows:
                 st.warning(f"No requirements found matching '{search_quality}'")
                 st.stop()
@@ -852,12 +899,12 @@ with tab_quality:
 
             # Sort filtered requirements by clarity score (lowest first) then alphabetically
             filtered_sorted = sorted(filtered, key=lambda x: (x["ClarityScore"], x["Requirement"]))
-            
+
             df = pd.DataFrame([
                 {
                     "Clarity": (
                         f'<a href="#req-{abs(hash(r["Requirement"]))}" class="clarity-score-bad">{r["ClarityScore"]}</a>'
-                        if r["ClarityScore"] < 100 
+                        if r["ClarityScore"] < 100
                         else f'<span class="clarity-score-good">{r["ClarityScore"]}</span>'
                     ),
                     "Requirement": r["Requirement"],
@@ -876,7 +923,7 @@ with tab_quality:
                 """,
                 unsafe_allow_html=True
             )
-            
+
             st.divider()
 
             # Details & Suggested Rewrites Section (now in same tab)
@@ -887,7 +934,7 @@ with tab_quality:
                 # Create anchor target for the table links
                 anchor_id = f"req-{abs(hash(r['Requirement']))}"
                 st.markdown(f'<div id="{anchor_id}"></div>', unsafe_allow_html=True)
-                
+
                 show_details_key = f"show_details_{idx}_{hash(r['Requirement'])}"
                 details_state_key = f"{show_details_key}_state"
                 rewrite_btn_key = f"rewrite_btn_{idx}_{hash(r['Requirement'])}"
@@ -914,14 +961,14 @@ with tab_quality:
                             st.markdown("#### 🗂️ Issue Details")
                             for i in r["Issues"]:
                                 st.markdown(
-                                    f"- <span style='color:#f0ad4e'><b>{i.type}</b></span> — {i.note}<br>&nbsp;&nbsp;&nbsp;&nbsp;_“…{i.span}…”_", unsafe_allow_html=True
+                                    f'- <span class="issue-type">{i.type}</span> — {i.note}<br>&nbsp;&nbsp;&nbsp;&nbsp;_"…{i.span}…"_', unsafe_allow_html=True
                                 )
                             st.markdown("---")
                             if st.button("✨ Suggest rewrite", key=rewrite_btn_key):
                                 has_tbd = any(i.type == "TBD" for i in r["Issues"])
                                 if has_tbd:
                                     st.markdown(
-                                        '<span style="color: #d9534f; font-weight: bold; font-size: 1.1em;">🚩 TBD — requires clarification</span>',
+                                        '<span class="tbd-warning">🚩 TBD — requires clarification</span>',
                                         unsafe_allow_html=True
                                     )
                                     st.info("This is not resolvable by AI. You must fill in the blank.")
@@ -934,130 +981,130 @@ with tab_quality:
                                         st.error(f"Failed to import rewrite functionality: {e}")
 
                             if rewrite_state_key in st.session_state:
-                                st.markdown("#### ✏️ <span style='color:#0072B2'>Rewrite</span>", unsafe_allow_html=True)
+                                st.markdown("#### ✏️ <span class='rewrite-header'>Rewrite</span>", unsafe_allow_html=True)
                                 st.info(st.session_state[rewrite_state_key])
 
             # Back to top button
             st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-            st.markdown("""
-                <a href="#quality-top" style="
-                    display: inline-block;
-                    background-color: #ffffff;
-                    border: 1px solid #cccccc;
-                    color: #262730;
-                    padding: 0.5rem 1rem;
-                    text-decoration: none;
-                    border-radius: 0.5rem;
-                    font-size: 1rem;
-                    font-weight: 400;
-                    line-height: 1.6;
-                    cursor: pointer;
-                    transition: all 0.15s ease-in-out;
-                    min-height: 2.5rem;
-                    min-width: 180px;
-                    box-sizing: border-box;
-                    text-align: center;
-                    vertical-align: middle;
-                    white-space: nowrap;
-                " onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#cccccc'; this.style.color='#262730'">
+            st.markdown('''
+                <a href="#quality-top" class="back-to-top">
                     ⬆️ Back to top
                 </a>
-            """, unsafe_allow_html=True)
+                <script>
+                // Prevent unwanted scrolling when Streamlit reruns
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Store current scroll position before Streamlit updates
+                    if (window.location.hash && window.location.hash.startsWith('#req-')) {
+                        // Only scroll to anchor if it was explicitly clicked, not on rerun
+                        if (!sessionStorage.getItem('streamlit_rerun')) {
+                            document.querySelector(window.location.hash)?.scrollIntoView({behavior: 'smooth', block: 'start'});
+                        } else {
+                            // Clear the flag and remove hash to prevent auto-scroll
+                            sessionStorage.removeItem('streamlit_rerun');
+                            history.replaceState(null, null, window.location.pathname);
+                        }
+                    }
+                });
+
+                // Set flag when any button is clicked to indicate this is a rerun
+                document.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                        sessionStorage.setItem('streamlit_rerun', 'true');
+                    }
+                });
+                </script>
+            ''', unsafe_allow_html=True)
 
         with subtab_dependency:
             if missing_refs:
-                st.markdown(f"""
+                # Build the missing refs HTML in one go
+                missing_refs_items = ''.join([
+                    f'<div class="ref-item"><span class="ref-badge warning">REF</span><code class="ref-code warning">{ref}</code></div>'
+                    for ref in sorted(missing_refs)
+                ])
+
+                st.markdown(f'''
                     <div class="dependency-section">
                         <div class="status-card status-warning">
-                            <div style="display: flex; align-items: flex-start;">
-                                <div class="status-icon" style="background-color: #fef3c7; color: #d97706;">
-                                    WARNING
-                                </div>
-                                <div style="flex: 1;">
-                                    <h3 class="section-title" style="color: #d97706;">
-                                        Missing References Detected
-                                    </h3>
-                                    <p style="margin: 0 0 1rem 0; color: #92400e; line-height: 1.5;">
+                            <div class="status-card-content">
+                                <div class="status-icon warning"></div>
+                                <div>
+                                    <h3 class="section-title warning">Missing References Detected</h3>
+                                    <p class="dependency-description warning">
                                         The following requirement IDs are referenced but do not exist in the current dataset:
                                     </p>
-                                    <div class="circular-refs" style="background: linear-gradient(45deg, #fef3c7 0%, #fed7aa 100%); border-color: #f59e0b;">
-                                        {''.join([f'<div class="ref-item"><span style="background: #f59e0b; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600;">REF</span><code style="color: #92400e; font-weight: 600;">{ref}</code></div>' for ref in sorted(missing_refs)])}
+                                    <div class="dependency-refs warning">
+                                        {missing_refs_items}
                                     </div>
-                                    <p style="margin: 0.75rem 0 0 0; color: #92400e; font-size: 0.9rem; font-style: italic;">
+                                    <p class="dependency-recommendation warning">
                                         <strong>Recommendation:</strong> Verify these requirement IDs exist or update the references.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
+                ''', unsafe_allow_html=True)
             else:
-                st.markdown("""
+                st.markdown('''
                     <div class="dependency-section">
                         <div class="status-card status-success">
-                            <div style="display: flex; align-items: center;">
-                                <div class="status-icon" style="background-color: #dcfce7; color: #16a34a;">
-                                    OK
-                                </div>
+                            <div class="status-card-content">
+                                <div class="status-icon success"></div>
                                 <div>
-                                    <h3 class="section-title" style="color: #16a34a;">
-                                        All References Valid
-                                    </h3>
-                                    <p style="margin: 0; color: #065f46; line-height: 1.5;">
+                                    <h3 class="section-title success">All References Valid</h3>
+                                    <p class="dependency-description success">
                                         No missing requirement references detected. All dependency links are valid.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
+                ''', unsafe_allow_html=True)
 
             if circular_refs:
-                st.markdown(f"""
+                # Build the circular refs HTML in one go
+                circular_refs_items = ''.join([
+                    f'<div class="ref-item"><span class="ref-badge error">CIRCULAR</span><strong class="ref-code error">{a}</strong><span class="dependency-arrow">↔</span><strong class="ref-code error">{b}</strong></div>'
+                    for a, b in circular_refs
+                ])
+
+                st.markdown(f'''
                     <div class="dependency-section">
                         <div class="status-card status-error">
-                            <div style="display: flex; align-items: flex-start;">
-                                <div class="status-icon" style="background-color: #fee2e2; color: #dc2626;">
-                                    ERROR
-                                </div>
-                                <div style="flex: 1;">
-                                    <h3 class="section-title" style="color: #dc2626;">
-                                        Circular Dependencies Detected
-                                    </h3>
-                                    <p style="margin: 0 0 1rem 0; color: #dc2626; line-height: 1.5;">
+                            <div class="status-card-content">
+                                <div class="status-icon error"></div>
+                                <div>
+                                    <h3 class="section-title error">Circular Dependencies Detected</h3>
+                                    <p class="dependency-description error">
                                         The following circular reference patterns were found:
                                     </p>
-                                    <div class="circular-refs">
-                                        {''.join([f'<div class="ref-item"><span style="background: #dc2626; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600;">CIRCULAR</span><strong style="color: #dc2626;">{a}</strong> <span style="color: #6b7280;">↔</span> <strong style="color: #dc2626;">{b}</strong></div>' for a, b in circular_refs])}
+                                    <div class="dependency-refs error">
+                                        {circular_refs_items}
                                     </div>
-                                    <p style="margin: 0.75rem 0 0 0; color: #dc2626; font-size: 0.9rem; font-style: italic;">
+                                    <p class="dependency-recommendation error">
                                         <strong>Critical:</strong> Review these requirements immediately to break the circular dependency chain.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
+                ''', unsafe_allow_html=True)
             else:
-                st.markdown("""
+                st.markdown('''
                     <div class="dependency-section">
                         <div class="status-card status-success">
-                            <div style="display: flex; align-items: center;">
-                                <div class="status-icon" style="background-color: #dcfce7; color: #16a34a;">
-                                    OK
-                                </div>
+                            <div class="status-card-content">
+                                <div class="status-icon success"></div>
                                 <div>
-                                    <h3 class="section-title" style="color: #16a34a;">
-                                        No Circular Dependencies
-                                    </h3>
-                                    <p style="margin: 0; color: #065f46; line-height: 1.5;">
+                                    <h3 class="section-title success">No Circular Dependencies</h3>
+                                    <p class="dependency-description success">
                                         No circular reference patterns detected. Dependency structure is clean and well-organized.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
+                ''', unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Failed to analyze clarity: {e}")
@@ -1072,7 +1119,7 @@ def render_compact_test_card(requirement, clarity_score, status):
         with col2:
             score_text = str(clarity_score) if clarity_score is not None else 'n/a'
             st.caption(f"Score: {score_text}")
-        
+
         # Generate and show test scenarios in compact format
         try:
             from analysis.testgen import generate_test_ideas
@@ -1080,22 +1127,22 @@ def render_compact_test_card(requirement, clarity_score, status):
         except ImportError as e:
             st.error(f"Test generation not available: {e}")
             return
-        
+
         with st.expander(f"{len(ideas['ideas'])} test scenario(s)", expanded=False):
             for i, idea in enumerate(ideas['ideas'][:3]):  # Limit to 3 for space
                 st.markdown(f"**{idea.get('title')}**")
-                
+
                 # Show all steps/acceptance (no truncation)
                 steps = list(idea.get('steps', []))
                 acceptance = list(idea.get('acceptance', []))
-                
+
                 # Mask for non-ready status
                 if status in ('provisional','blocked'):
                     def _mask(s):
                         return re.sub(r"\b\d+(?:\.\d+)?\b", "<target>", s)
                     steps = [_mask(s) for s in steps]
                     acceptance = [_mask(a) for a in acceptance]
-                
+
                 # Format acceptance criteria with proper capitalization
                 def format_acceptance(text):
                     # Split by common sentence starters and rejoin with proper capitalization
@@ -1114,19 +1161,19 @@ def render_compact_test_card(requirement, clarity_score, status):
                     if result and result[0].islower():
                         result = result[0].upper() + result[1:]
                     return result
-                
+
                 formatted_acceptance = [format_acceptance(a) for a in acceptance]
-                
+
                 if steps:
                     steps_html = "<br>".join([f"{j}. {step}" for j, step in enumerate(steps, 1)])
-                    st.markdown(f'<div style="font-size:0.9rem; line-height:1.1;"><strong>Steps:</strong><br>{steps_html}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="test-steps"><strong>Steps:</strong><br>{steps_html}</div>', unsafe_allow_html=True)
                 if formatted_acceptance:
                     accept_html = "<br>".join([f"{accept}" for accept in formatted_acceptance])
-                    st.markdown(f'<div style="font-size:0.9rem; line-height:1.1;"><br><strong>Accept:</strong><br>{accept_html}</div>', unsafe_allow_html=True)
-                
+                    st.markdown(f'<div class="test-acceptance"><br><strong>Accept:</strong><br>{accept_html}</div>', unsafe_allow_html=True)
+
                 if i < len(ideas['ideas']) - 1:
                     st.divider()
-        
+
         # Compact export status
         if status == 'blocked':
             st.caption("Export disabled")
@@ -1135,7 +1182,7 @@ def render_compact_test_card(requirement, clarity_score, status):
             st.checkbox('Confirm for export', key=confirm_key, help="Confirm export for provisional item")
         else:
             st.caption("Ready for export")
-        
+
         st.divider()
 
 st.divider()
@@ -1143,7 +1190,7 @@ with tab_tests:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to generate test scenarios.")
         st.stop()
-        
+
     try:
         requirement_rows = get_requirement_rows()
         if not requirement_rows:
@@ -1154,11 +1201,11 @@ with tab_tests:
         if search_tests:
             search_terms = search_tests.lower().split()
             filtered_requirement_rows = []
-            
+
             # Get the original normalized data for more comprehensive search
             docs_hash = get_uploaded_docs_hash()
             normalized_results = get_normalized_requirements(docs_hash)
-            
+
             for r in requirement_rows:
                 # Find the corresponding normalized data for this requirement
                 normalized_data = None
@@ -1166,17 +1213,17 @@ with tab_tests:
                     if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
                         normalized_data = norm_r
                         break
-                
+
                 # Search in requirement text, source, normalized text, and categories
                 text_to_search = f"{r['Requirement']} {r['Source']}".lower()
                 if normalized_data:
                     text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
-                
+
                 if all(term in text_to_search for term in search_terms):
                     filtered_requirement_rows.append(r)
-            
+
             requirement_rows = filtered_requirement_rows
-            
+
             if not requirement_rows:
                 st.warning(f"No requirements found matching '{search_tests}'")
                 st.stop()
@@ -1192,7 +1239,7 @@ with tab_tests:
         ready_reqs = []
         provisional_reqs = []
         blocked_reqs = []
-        
+
         for r in requirement_rows:
             req_key = (r["Requirement"], r["Source"])
             clarity = clarity_map.get(req_key, None)
@@ -1224,9 +1271,9 @@ with tab_tests:
             show_provisional = st.checkbox(f"Provisional ({len(provisional_reqs)})", value=True, key="show_provisional_tests")
         with col3:
             show_blocked = st.checkbox(f"Blocked ({len(blocked_reqs)})", value=False, key="show_blocked_tests")
-        
+
         st.divider()
-        
+
         # Single download button for all test scenarios
         if st.button("Download Test Scenarios", type="primary", help="Download test scenarios for all visible requirements"):
             try:
@@ -1234,10 +1281,10 @@ with tab_tests:
             except ImportError as e:
                 st.error(f"Test generation not available: {e}")
                 st.stop()
-                
+
             with st.spinner("Generating test scenarios..."):
                 all_export_rows = []
-                
+
                 # Process all requirements based on current visibility settings
                 for req_data in ready_reqs:
                     requirement, clarity_score = req_data
@@ -1246,7 +1293,7 @@ with tab_tests:
                         for idea in ideas['ideas']:
                             steps = list(idea.get('steps', []))
                             acceptance = list(idea.get('acceptance', []))
-                            
+
                             # Format acceptance criteria
                             def format_acceptance(text):
                                 parts = re.split(r'\b(Given|When|Then|And|But)\b', text)
@@ -1263,9 +1310,9 @@ with tab_tests:
                                 if result and result[0].islower():
                                     result = result[0].upper() + result[1:]
                                 return result
-                            
+
                             formatted_acceptance = [format_acceptance(a) for a in acceptance]
-                            
+
                             all_export_rows.append({
                                 'requirement': requirement['Requirement'],
                                 'status': 'ready',
@@ -1273,7 +1320,7 @@ with tab_tests:
                                 'test_steps': ' | '.join(steps),
                                 'acceptance_criteria': ' | '.join(formatted_acceptance)
                             })
-                
+
                 # Process provisional requirements
                 for req_data in provisional_reqs:
                     requirement, clarity_score = req_data
@@ -1284,13 +1331,13 @@ with tab_tests:
                             for idea in ideas['ideas']:
                                 steps = list(idea.get('steps', []))
                                 acceptance = list(idea.get('acceptance', []))
-                                
+
                                 # Mask for provisional
                                 def _mask(s):
                                     return re.sub(r"\b\d+(?:\.\d+)?\b", "<target>", s)
                                 steps = [_mask(s) for s in steps]
                                 acceptance = [_mask(a) for a in acceptance]
-                                
+
                                 # Format acceptance criteria
                                 def format_acceptance(text):
                                     parts = re.split(r'\b(Given|When|Then|And|But)\b', text)
@@ -1307,9 +1354,9 @@ with tab_tests:
                                     if result and result[0].islower():
                                         result = result[0].upper() + result[1:]
                                     return result
-                                
+
                                 formatted_acceptance = [format_acceptance(a) for a in acceptance]
-                                
+
                                 all_export_rows.append({
                                     'requirement': requirement['Requirement'],
                                     'status': 'provisional',
@@ -1317,20 +1364,20 @@ with tab_tests:
                                     'test_steps': ' | '.join(steps),
                                     'acceptance_criteria': ' | '.join(formatted_acceptance)
                                 })
-                
+
                 # Generate and provide download
                 if all_export_rows:
                     out_df = pd.DataFrame(all_export_rows)
                     csv_bytes = out_df.to_csv(index=False).encode('utf-8')
                     st.success(f"Generated {len(all_export_rows)} test scenarios!")
-                    st.download_button('⬇️ Click to Download CSV', 
-                                     data=csv_bytes, 
-                                     file_name="all_test_scenarios.csv", 
+                    st.download_button('⬇️ Click to Download CSV',
+                                     data=csv_bytes,
+                                     file_name="all_test_scenarios.csv",
                                      mime='text/csv',
                                      type="primary")
                 else:
                     st.warning("No test scenarios available for download. Please confirm provisional exports or select different sections.")
-        
+
         # Dynamic column layout based on visible sections
         visible_sections = []
         if show_ready and ready_reqs:
@@ -1339,7 +1386,7 @@ with tab_tests:
             visible_sections.append(("provisional", provisional_reqs, "Provisional"))
         if show_blocked and blocked_reqs:
             visible_sections.append(("blocked", blocked_reqs, "Blocked"))
-        
+
         if not visible_sections:
             st.info("No sections selected or no requirements match the current criteria.")
         else:
@@ -1350,7 +1397,7 @@ with tab_tests:
                 cols = st.columns(2)
             else:
                 cols = st.columns(3)
-            
+
             for i, (status, reqs, title) in enumerate(visible_sections):
                 with cols[i]:
                     expanded = (status == "ready") or (status == "provisional" and not show_ready)
@@ -1366,11 +1413,11 @@ with tab_tests:
 
     with subtab_traceability:
         st.markdown("## Traceability Matrix")
-        
+
         try:
             # Lazy import for traceability
             from analysis.traceability import build_trace_matrix
-            
+
             requirement_rows = get_requirement_rows()
             if not requirement_rows:
                 st.info("No requirements detected.")
@@ -1380,11 +1427,11 @@ with tab_tests:
             if search_traceability:
                 search_terms = search_traceability.lower().split()
                 filtered_requirement_rows = []
-                
+
                 # Get the original normalized data for more comprehensive search
                 docs_hash = get_uploaded_docs_hash()
                 normalized_results = get_normalized_requirements(docs_hash)
-                
+
                 for r in requirement_rows:
                     # Find the corresponding normalized data for this requirement
                     normalized_data = None
@@ -1392,17 +1439,17 @@ with tab_tests:
                         if norm_r["text"] == r["Requirement"] and norm_r["source"] == r["Source"]:
                             normalized_data = norm_r
                             break
-                    
+
                     # Search in requirement text, source, normalized text, and categories
                     text_to_search = f"{r['Requirement']} {r['Source']}".lower()
                     if normalized_data:
                         text_to_search += f" {normalized_data['normalized']} {' '.join(normalized_data['categories'])}".lower()
-                    
+
                     if all(term in text_to_search for term in search_terms):
                         filtered_requirement_rows.append(r)
-                
+
                 requirement_rows = filtered_requirement_rows
-                
+
                 if not requirement_rows:
                     st.warning(f"No requirements found matching '{search_traceability}'")
                     st.stop()
@@ -1418,13 +1465,13 @@ with tab_tests:
                 "CoveredBy": "Verified By",
                 "Source": "Source document"
             })
-            
+
             # Clean up source document names - remove "data/" and keep only filename
             if "Source document" in display_df.columns:
                 display_df["Source document"] = display_df["Source document"].apply(
                     lambda x: x.replace("data/", "").split("/")[-1] if isinstance(x, str) else x
                 )
-            
+
             desired_cols = [
                 "Requirement ID",
                 "Type",
@@ -1463,33 +1510,33 @@ with tab_dashboard:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to view the requirements dashboard.")
         st.stop()
-        
+
     st.markdown("## Requirements Dashboard")
-    
+
     try:
         docs_hash = get_uploaded_docs_hash()
         results = get_normalized_requirements(docs_hash)
         total_reqs = len(results) if results else 0
-        
+
         if total_reqs == 0:
             st.warning("No requirements data available. Please load requirements in the Search tab first.")
         else:
             # === KPI CARDS ROW ===
             col1, col2, col3, col4, col5 = st.columns(5)
-            
+
             with col1:
                 st.metric(
-                    label="📋 Total Requirements", 
+                    label="Total Requirements",
                     value=total_reqs,
                     help="Total number of requirements processed"
                 )
-            
+
             # Calculate clarity metrics
             docs_hash = get_uploaded_docs_hash()
             clarity_rows = get_clarity_results(docs_hash)
             issue_counts = {"TBD": 0, "Ambiguous": 0, "NonVerifiable": 0, "PassiveVoice": 0}
             clarity_scores = []
-            
+
             for r in clarity_rows:
                 if r.get("ClarityScore") is not None:
                     clarity_scores.append(r["ClarityScore"])
@@ -1498,33 +1545,33 @@ with tab_dashboard:
                 if "Ambiguous" in types: issue_counts["Ambiguous"] += 1
                 if "NonVerifiable" in types: issue_counts["NonVerifiable"] += 1
                 if "PassiveVoice" in types: issue_counts["PassiveVoice"] += 1
-            
+
             avg_clarity = sum(clarity_scores) / len(clarity_scores) if clarity_scores else 0
-            
+
             with col2:
                 st.metric(
-                    label="🎯 Avg Clarity Score", 
+                    label="Avg Clarity Score",
                     value=f"{avg_clarity:.1f}",
                     delta=None,  # Remove confusing delta calculation
                     help="Average clarity score (1-10 scale, higher is better)"
                 )
-            
+
             with col3:
                 tbd_pct = 100 * issue_counts['TBD'] / total_reqs if total_reqs else 0
                 st.metric(
-                    label="TBD Issues", 
+                    label="TBD Issues",
                     value=f"{tbd_pct:.1f}%",
                     help="Percentage of requirements with TBD (To Be Determined) content"
                 )
-            
+
             with col4:
                 ambiguous_pct = 100 * issue_counts['Ambiguous'] / total_reqs if total_reqs else 0
                 st.metric(
-                    label="Ambiguous", 
+                    label="Ambiguous",
                     value=f"{ambiguous_pct:.1f}%",
                     help="Percentage of requirements with ambiguous language"
                 )
-            
+
             # Calculate test coverage
             requirement_rows = [
                 {"Source": r["source"], "Requirement": r["text"]}
@@ -1534,30 +1581,30 @@ with tab_dashboard:
             sys_rows = trace_df[trace_df["Type"] == "System"]
             sys_covered = sys_rows[sys_rows["CoveredBy"].apply(lambda x: any(tid.startswith("TST-") for tid in x.split(",") if tid.strip()))] if len(sys_rows) > 0 else pd.DataFrame()
             coverage_pct = 100 * len(sys_covered) / len(sys_rows) if len(sys_rows) else 0
-            
+
             with col5:
                 st.metric(
-                    label="Test Coverage", 
+                    label="Test Coverage",
                     value=f"{coverage_pct:.1f}%",
                     help="Percentage of system requirements covered by tests"
                 )
-            
+
             st.markdown("---")
-            
+
             # === COVERAGE VISUALIZATION BAR ===
             st.markdown("### Test Coverage Overview")
-            
+
             if len(sys_rows) > 0:
                 covered_count = len(sys_covered)
                 uncovered_count = len(sys_rows) - covered_count
-                
+
                 # Create coverage data
                 coverage_data = pd.DataFrame({
                     'Status': ['Covered by Tests', 'Not Covered'],
                     'Count': [covered_count, uncovered_count],
                     'Percentage': [coverage_pct, 100 - coverage_pct]
                 })
-                
+
                 # Visual coverage bar using progress bar
                 col_bar1, col_bar2 = st.columns([3, 1])
                 with col_bar1:
@@ -1569,21 +1616,21 @@ with tab_dashboard:
                         st.warning("Good")
                     else:
                         st.error("Needs Improvement")
-                        
+
                 # Coverage breakdown chart
                 st.bar_chart(coverage_data.set_index('Status')['Count'])
             else:
                 st.info("No system requirements found for coverage analysis")
-            
+
             st.markdown("---")
-            
+
             # === SIDE-BY-SIDE CHARTS ===
             chart_col1, chart_col2 = st.columns(2)
-            
+
             # Left chart: Quality Issues Distribution
             with chart_col1:
                 st.markdown("### Quality Issues Distribution")
-                
+
                 if any(count > 0 for count in issue_counts.values()):
                     issue_data = pd.DataFrame({
                         'Issue Type': list(issue_counts.keys()),
@@ -1591,76 +1638,70 @@ with tab_dashboard:
                         'Percentage': [100 * count / total_reqs for count in issue_counts.values()]
                     })
                     issue_data = issue_data[issue_data['Count'] > 0]  # Only show non-zero counts
-                    
+
                     # Rename for better display
                     issue_data['Issue Type'] = issue_data['Issue Type'].replace({
                         'TBD': 'TBD Content',
-                        'Ambiguous': 'Ambiguous Language', 
+                        'Ambiguous': 'Ambiguous Language',
                         'NonVerifiable': 'Non-Verifiable',
                         'PassiveVoice': 'Passive Voice'
                     })
-                    
+
                     st.bar_chart(issue_data.set_index('Issue Type')['Count'])
-                    
+
                     # Show percentages in a small table
-                    st.caption("Issue Breakdown:")
+                    st.markdown('<p class="breakdown-header">Issue Breakdown:</p>', unsafe_allow_html=True)
                     for _, row in issue_data.iterrows():
                         st.caption(f"• {row['Issue Type']}: {row['Count']} ({row['Percentage']:.1f}%)")
                 else:
                     st.success("No quality issues detected!")
-            
-            # Right chart: Requirement Types Distribution  
+
+            # Right chart: Requirement Types Distribution
             with chart_col2:
                 st.markdown("### Requirement Types Distribution")
-                
+
                 all_categories = [cat for r in results for cat in r.get("categories", [])]
                 if all_categories:
                     cat_series = pd.Series(all_categories)
                     cat_counts = cat_series.value_counts()
-                    
+
                     st.bar_chart(cat_counts)
-                    
-                    # Show percentages
-                    st.caption("Type Breakdown:")
-                    for cat_type, count in cat_counts.head(5).items():  # Top 5
+
+                    # Show percentages - all types without expander
+                    st.markdown('<p class="breakdown-header">Type Breakdown:</p>', unsafe_allow_html=True)
+                    for cat_type, count in cat_counts.items():  # Show all types
                         pct = 100 * count / total_reqs
                         st.caption(f"• {cat_type}: {count} ({pct:.1f}%)")
-                    
-                    if len(cat_counts) > 5:
-                        with st.expander(f"... and {len(cat_counts) - 5} more types"):
-                            for cat_type, count in cat_counts.iloc[5:].items():  # Remaining types
-                                pct = 100 * count / total_reqs
-                                st.caption(f"• {cat_type}: {count} ({pct:.1f}%)")
                 else:
                     st.info("No requirement type categories available")
-            
+
             # === SUMMARY INSIGHTS ===
             st.markdown("---")
-            st.markdown("### Key Insights")
-            
+            st.markdown('<h2 class="key-insights-header">Key Insights</h2>', unsafe_allow_html=True)
+
             insights = []
-            
+
             if avg_clarity < 5:
                 insights.append("**Low clarity scores** - Consider reviewing requirement definitions")
             elif avg_clarity > 7:
                 insights.append("**Good clarity scores** - Requirements are well-defined")
-                
+
             if tbd_pct > 20:
                 insights.append("**High TBD content** - Many requirements need further definition")
             elif tbd_pct == 0:
                 insights.append("**No TBD content** - All requirements are fully defined")
-                
+
             if coverage_pct < 50:
                 insights.append("**Low test coverage** - Consider adding more test scenarios")
             elif coverage_pct > 80:
                 insights.append("**Excellent test coverage** - Most requirements are tested")
-                
+
             if len(insights) == 0:
                 insights.append("**Good overall status** - Requirements are in decent shape")
-            
+
             for insight in insights:
                 st.markdown(insight)
-                
+
     except Exception as e:
         st.error(f"Dashboard error: {e}")
         if DEBUG:

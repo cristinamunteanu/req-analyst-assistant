@@ -84,16 +84,570 @@ h3 {
 
 /* Sidebar improvements */
 .stSidebar {
-    background-color: #f8fafc;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     border-right: 1px solid #e2e8f0;
 }
 
-.stSidebar .stSelectbox, .stSidebar .stSlider {
-    background-color: white;
+/* Professional sidebar header */
+.sidebar-header {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+    padding: 1.25rem;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.15);
+    border: none;
+}
+
+/* Section headers in sidebar */
+.section-header {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    margin: 0.25rem 0 0.5rem 0 !important;
+    line-height: 1.2 !important;
+}
+
+.sidebar-header-title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+
+.sidebar-header-subtitle {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+/* Upload section styling */
+.upload-section {
+    background: white;
     border-radius: 8px;
-    padding: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
     border: 1px solid #e2e8f0;
+}
+
+/* Files ready for processing section */
+.files-ready-section {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 6px;
+    border-left: 3px solid #3b82f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.file-name {
+    font-weight: 500;
+    color: #1e293b;
+    font-size: 0.9rem;
+}
+
+.file-size {
+    color: #64748b;
+    font-size: 0.8rem;
+    background: #f1f5f9;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* Documents section styling */
+.documents-section {
+    margin-top: 1rem;
+}
+
+.document-list {
+    margin: 0.5rem 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.document-item {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.document-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+}
+
+.document-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--doc-color);
+}
+
+.document-item.small {
+    --doc-color: #10b981;
+}
+
+.document-item.medium {
+    --doc-color: #f59e0b;
+}
+
+.document-item.large {
+    --doc-color: #ef4444;
+}
+
+.doc-name {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+    line-height: 1.2;
+}
+
+.doc-info {
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.no-docs-message {
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+    padding: 2rem 1rem;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+
+/* Sidebar button improvements */
+.stSidebar .stButton > button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    width: 100%;
+}
+
+.stSidebar .stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+/* Clear button styling - target by position in documents section */
+.stSidebar .documents-section .stButton:last-child > button,
+.stSidebar button[data-testid*="clear"],
+.stSidebar div:has(button) button:contains("Clear All Documents") {
+    background: transparent !important;
+    color: #3b82f6 !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: none !important;
+    width: 100%;
+}
+
+.stSidebar .documents-section .stButton:last-child > button:hover,
+.stSidebar button[data-testid*="clear"]:hover,
+.stSidebar div:has(button) button:contains("Clear All Documents"):hover {
+    background: #3b82f6 !important;
+    color: white !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Form submit button styling for clear documents */
+.stSidebar .stForm button[type="submit"] {
+    background: transparent !important;
+    color: #3b82f6 !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    font-weight: 500 !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease !important;
+}
+
+.stSidebar .stForm button[type="submit"]:hover {
+    background: #3b82f6 !important;
+    color: white !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* File uploader styling in sidebar */
+.stSidebar div[data-testid="stFileUploader"] {
+    background: transparent;
+    border: none;
+}
+
+.stSidebar div[data-testid="stFileUploader"] button {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    color: #3b82f6;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.stSidebar div[data-testid="stFileUploader"] button:hover {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+/* Info messages in sidebar */
+.stSidebar .stInfo {
+    background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+/* Search functionality styling */
+.search-stats {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+}
+
+.filter-stats {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid #22c55e;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 3px rgba(34, 197, 94, 0.1);
+}
+
+/* Improved text sizing for sidebar */
+.stSidebar p, .stSidebar span, .stSidebar div {
+    font-size: 0.9rem !important;
+}
+
+.stSidebar h3, .stSidebar h4 {
+    color: #1e293b;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Professional spacing */
+.stSidebar > div {
+    padding: 1rem 1rem 2rem 1rem;
+}
+
+/* Scrollbar styling for sidebar */
+.stSidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.stSidebar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.stSidebar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.stSidebar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Rewrite section styling */
+.rewrite-header {
+    color: #0072B2;
+}
+
+/* Test generation styling */
+.test-steps {
+    font-size: 0.9rem;
+    line-height: 1.1;
+}
+
+.test-acceptance {
+    font-size: 0.9rem;
+    line-height: 1.1;
+}
+
+/* Key Insights header styling */
+.key-insights-header {
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    margin: 1.5rem 0 1rem 0 !important;
+    line-height: 1.2 !important;
+}
+
+/* Breakdown headers styling */
+.breakdown-header {
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    margin: 0.5rem 0 0.25rem 0 !important;
+    font-size: 0.875rem !important;
+}
+
+/* Back to top button styling */
+.back-to-top {
+    display: inline-block;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    color: #262730;
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.6;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    min-height: 2.5rem;
+    min-width: 180px;
+    box-sizing: border-box;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.back-to-top:hover {
+    border-color: #ff4b4b;
+    color: #ff4b4b;
+}
+
+/* Issue type styling */
+.issue-type {
+    color: #f0ad4e;
+    font-weight: bold;
+}
+
+/* TBD warning styling */
+.tbd-warning {
+    color: #d9534f;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+/* Dependency arrow styling */
+.dependency-arrow {
+    color: #6b7280;
+}
+
+/* Prevent automatic scroll to anchors after Streamlit rerun */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Ensure anchors don't cause unwanted jumps */
+div[id^="req-"] {
+    scroll-margin-top: 20px;
+}
+
+/* Dependencies section styling */
+.dependency-section {
+    margin: 1rem 0;
+}
+
+.status-card {
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid;
     margin-bottom: 1rem;
+}
+
+.status-card.status-warning {
+    background: linear-gradient(45deg, #fef3c7 0%, #fed7aa 100%);
+    border-color: #f59e0b;
+}
+
+.status-card.status-error {
+    background: linear-gradient(45deg, #fee2e2 0%, #fecaca 100%);
+    border-color: #dc2626;
+}
+
+.status-card.status-success {
+    background: linear-gradient(45deg, #dcfce7 0%, #bbf7d0 100%);
+    border-color: #16a34a;
+}
+
+.status-card-content {
+    display: flex;
+    align-items: flex-start;
+}
+
+.status-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.status-icon.warning {
+    background-color: #fef3c7;
+    color: #d97706;
+}
+
+.status-icon.error {
+    background-color: #fee2e2;
+    color: #dc2626;
+}
+
+.status-icon.success {
+    background-color: #dcfce7;
+    color: #16a34a;
+}
+
+.section-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.section-title.warning {
+    color: #d97706;
+}
+
+.section-title.error {
+    color: #dc2626;
+}
+
+.section-title.success {
+    color: #16a34a;
+}
+
+.dependency-description {
+    margin: 0 0 1rem 0;
+    line-height: 1.5;
+}
+
+.dependency-description.warning {
+    color: #92400e;
+}
+
+.dependency-description.error {
+    color: #dc2626;
+}
+
+.dependency-description.success {
+    color: #065f46;
+}
+
+.dependency-refs {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 1rem 0;
+}
+
+.dependency-refs.warning {
+    background: linear-gradient(45deg, #fef3c7 0%, #fed7aa 100%);
+    border-color: #f59e0b;
+}
+
+.dependency-refs.error {
+    background: linear-gradient(45deg, #fee2e2 0%, #fecaca 100%);
+    border-color: #dc2626;
+}
+
+.ref-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0;
+}
+
+.ref-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+}
+
+.ref-badge.warning {
+    background: #f59e0b;
+}
+
+.ref-badge.error {
+    background: #dc2626;
+}
+
+.ref-code {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.ref-code.warning {
+    color: #92400e;
+}
+
+.ref-code.error {
+    color: #dc2626;
+}
+
+.dependency-recommendation {
+    margin: 0.75rem 0 0 0;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.dependency-recommendation.warning {
+    color: #92400e;
+}
+
+.dependency-recommendation.error {
+    color: #dc2626;
 }
 
 /* Enhanced button styling */
@@ -329,8 +883,22 @@ div[data-testid="stFileUploader"] div,
     font-size: 2.8rem !important;
 }
 
+/* Specific override for header title to match sidebar size */
+.stApp .content-card .header-title {
+    font-size: 2.2rem !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.025em !important;
+}
+
 .content-card p {
     font-size: 1.2rem !important;
+}
+
+/* Specific override for header subtitle to match proportion */
+.stApp .content-card .header-subtitle {
+    font-size: 1.1rem !important;
+    font-weight: 400 !important;
+    opacity: 0.9 !important;
 }
 
 .sidebar-header h2 {
@@ -735,13 +1303,13 @@ button[kind="secondary"] {
 .header-title {
     color: white;
     margin-bottom: 0.5rem;
-    font-size: 4.5rem;
+    font-size: 1.4rem;
 }
 
 .header-subtitle {
-    font-size: 2.0rem;
+    font-size: 0.95rem;
     color: white !important;
-    opacity: 1.0;
+    opacity: 0.9;
     margin-bottom: 0;
 }
 
