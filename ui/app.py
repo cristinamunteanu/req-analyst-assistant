@@ -214,28 +214,37 @@ def get_requirement_rows():
                 temp_file.close()
                 temp_files.append((temp_file.name, doc.get('name', 'unknown')))
             
-            # Extract requirements using model-based approach
-            file_paths = [temp_path for temp_path, _ in temp_files]
-            extracted_requirements = extract_requirements_with_model(file_paths, use_llm=use_llm)
+            # Extract requirements using model-based approach, processing one document at a time
+            # to maintain proper source mapping
+            all_extracted_requirements = []
+            for temp_path, orig_name in temp_files:
+                file_requirements = extract_requirements_with_model([temp_path], use_llm=use_llm)
+                
+                # Update the source_hint to be the original document name for all requirements from this file
+                for req in file_requirements:
+                    req.source_hint = orig_name
+                    all_extracted_requirements.append(req)
             
             if DEBUG:
-                log(f"Model-based extraction found {len(extracted_requirements)} requirements")
+                log(f"Model-based extraction found {len(all_extracted_requirements)} requirements")
+                for i, req in enumerate(all_extracted_requirements):
+                    log(f"  Req {i+1}: ID='{req.id}', source='{req.source_hint}', text_preview='{req.text[:50]}...'")
             
             # Convert to the expected format
-            for req in extracted_requirements:
-                # The source_hint from the extractor should contain the file path
-                # Map it back to the original document name
+            for req in all_extracted_requirements:
+                # Use the source_hint which now contains the original document name
                 source_name = req.source_hint
                 
-                # Try to find the matching original document name
-                for temp_path, orig_name in temp_files:
-                    if temp_path in req.source_hint:
-                        source_name = orig_name
-                        break
+                # Include requirement ID in the text if available
+                requirement_text = req.text
+                if req.id and req.id.strip():
+                    # Check if ID is already in the text
+                    if req.id not in req.text:
+                        requirement_text = f"{req.id}: {req.text}"
                 
                 requirement_rows.append({
                     "Source": source_name,
-                    "Requirement": req.text,
+                    "Requirement": requirement_text,
                 })
                 
         finally:
