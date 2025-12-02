@@ -3,6 +3,8 @@ setup.py
 analysis/__init__.py
 analysis/heuristics.py
 analysis/index.py
+analysis/llm_providers.py
+analysis/model_extractor.py
 analysis/normalize_requirements.py
 analysis/qa.py
 analysis/rewrites.py
@@ -20,3 +22,6 @@ tests/test_index.py
 tests/test_ingestion.py
 ui/__init__.py
 ui/app.py
+ui/app_backup.py
+ui/app_working_test.py
+ui/test_tabs.py

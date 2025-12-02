@@ -1,7 +1,13 @@
-from typing import List
+from typing import List, Optional, Dict, Any
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from .model_extractor import ModelBasedExtractor, ExtractedRequirement
+from .llm_providers import get_default_provider
+import logging
+
+logger = logging.getLogger(__name__)
 
 def build_index(raw_docs: List[dict], embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"):
     """
@@ -56,3 +62,122 @@ def build_index(raw_docs: List[dict], embed_model: str = "sentence-transformers/
     except Exception as e:
         print(f"Failed to build FAISS index or generate embeddings: {e}")
         return None
+
+
+def extract_requirements_with_model(file_paths: List[str], 
+                                   use_llm: bool = True,
+                                   llm_provider: Optional[Any] = None) -> List[ExtractedRequirement]:
+    """
+    Extract requirements from documents using the model-based approach.
+    
+    This function implements the 3-step process:
+    1. Document chunking with structure preservation
+    2. LLM-based requirement extraction with JSON schema  
+    3. Post-processing with regex helpers
+    
+    Args:
+        file_paths: List of document file paths to process
+        use_llm: Whether to use LLM for extraction (fallback to heuristics if False)
+        llm_provider: Optional LLM provider instance. If None, auto-detects available provider.
+        
+    Returns:
+        List of ExtractedRequirement objects
+    """
+    if not file_paths:
+        return []
+        
+    # Auto-detect LLM provider if not provided and LLM is requested
+    if use_llm and llm_provider is None:
+        llm_provider = get_default_provider()
+        if llm_provider is None:
+            logger.warning("No LLM provider available, falling back to heuristic extraction")
+            use_llm = False
+    
+    # Create extractor instance
+    extractor = ModelBasedExtractor(
+        max_chunk_chars=3000,
+        llm_provider=llm_provider if use_llm else None
+    )
+    
+    all_requirements = []
+    
+    for file_path in file_paths:
+        try:
+            logger.info(f"Extracting requirements from: {file_path}")
+            requirements = extractor.extract_requirements(file_path)
+            all_requirements.extend(requirements)
+        except Exception as e:
+            logger.error(f"Failed to extract requirements from {file_path}: {e}")
+            continue
+    
+    return all_requirements
+
+
+def convert_extracted_to_dict(requirements: List[ExtractedRequirement]) -> List[Dict[str, Any]]:
+    """
+    Convert ExtractedRequirement objects to dictionary format for compatibility.
+    
+    Args:
+        requirements: List of ExtractedRequirement objects
+        
+    Returns:
+        List of dictionaries with requirement data
+    """
+    result = []
+    
+    for req in requirements:
+        req_dict = {
+            'id': req.id,
+            'text': req.text,
+            'type': req.type_hint,
+            'source': req.source_hint,
+            'chunk_index': req.chunk_index,
+            'confidence': getattr(req, 'confidence', 1.0),
+            'quality_issues': getattr(req, 'quality_issues', [])
+        }
+        result.append(req_dict)
+    
+    return result
+
+
+def create_requirements_summary(requirements: List[ExtractedRequirement]) -> Dict[str, Any]:
+    """
+    Create a summary of extracted requirements for dashboard display.
+    
+    Args:
+        requirements: List of ExtractedRequirement objects
+        
+    Returns:
+        Dictionary containing summary statistics
+    """
+    if not requirements:
+        return {
+            'total_count': 0,
+            'by_type': {},
+            'with_ids': 0,
+            'quality_issues': {}
+        }
+    
+    # Count by type
+    by_type = {}
+    for req in requirements:
+        req_type = req.type_hint
+        by_type[req_type] = by_type.get(req_type, 0) + 1
+    
+    # Count requirements with IDs
+    with_ids = sum(1 for req in requirements if req.id)
+    
+    # Count quality issues
+    quality_issues = {}
+    for req in requirements:
+        issues = getattr(req, 'quality_issues', [])
+        for issue in issues:
+            quality_issues[issue] = quality_issues.get(issue, 0) + 1
+    
+    return {
+        'total_count': len(requirements),
+        'by_type': by_type,
+        'with_ids': with_ids,
+        'quality_issues': quality_issues,
+        'avg_confidence': sum(getattr(req, 'confidence', 1.0) for req in requirements) / len(requirements)
+    }

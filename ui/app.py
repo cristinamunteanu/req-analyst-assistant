@@ -146,6 +146,13 @@ def process_uploaded_files(uploaded_files):
 
 def load_documents_from_session():
     """Load documents from session state (uploaded files)."""
+    # Debug session state
+    if DEBUG:
+        print(f"[DEBUG] Session state check:")
+        print(f"  use_uploaded: {getattr(st.session_state, 'use_uploaded', 'NOT_SET')}")
+        print(f"  uploaded_docs exists: {hasattr(st.session_state, 'uploaded_docs')}")
+        print(f"  uploaded_docs count: {len(getattr(st.session_state, 'uploaded_docs', []))}")
+    
     if st.session_state.use_uploaded and st.session_state.uploaded_docs:
         return st.session_state.uploaded_docs
     else:
@@ -180,25 +187,87 @@ def get_requirement_rows():
         for i, doc in enumerate(docs):
             log(f"  Document {i+1}: {doc.get('name', 'unknown')} ({len(doc.get('text', ''))} chars)")
 
-    # Lazy import - only when needed
-    try:
-        from analysis.utils import split_into_requirements, is_requirement
-    except ImportError as e:
-        st.error(f"Failed to import analysis utilities: {e}")
+    if not docs:
         return []
 
-    for doc in docs:
-        doc_requirements = []
-        for req in split_into_requirements(doc["text"]):
-            if is_requirement(req):
-                requirement_rows.append({
-                    "Source": doc.get("source") or doc.get("name", "unknown"),
-                    "Requirement": req,
-                })
-                doc_requirements.append(req)
-
+    # Try model-based extraction first (LLM with regex fallback)
+    try:
+        from analysis.index import extract_requirements_with_model, convert_extracted_to_dict
+        from analysis.llm_providers import get_default_provider
+        import tempfile
+        import os
+        
+        # Check if LLM is available
+        llm_provider = get_default_provider()
+        use_llm = llm_provider is not None
+        
         if DEBUG:
-            log(f"  Found {len(doc_requirements)} requirements in {doc.get('name', 'unknown')}")
+            method = "LLM with regex fallback" if use_llm else "regex/heuristics only"
+            log(f"Using extraction method: {method}")
+        
+        # Create temporary files for each document since the extractor expects file paths
+        temp_files = []
+        try:
+            for doc in docs:
+                temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+                temp_file.write(doc.get('text', ''))
+                temp_file.close()
+                temp_files.append((temp_file.name, doc.get('name', 'unknown')))
+            
+            # Extract requirements using model-based approach
+            file_paths = [temp_path for temp_path, _ in temp_files]
+            extracted_requirements = extract_requirements_with_model(file_paths, use_llm=use_llm)
+            
+            if DEBUG:
+                log(f"Model-based extraction found {len(extracted_requirements)} requirements")
+            
+            # Convert to the expected format
+            for req in extracted_requirements:
+                # The source_hint from the extractor should contain the file path
+                # Map it back to the original document name
+                source_name = req.source_hint
+                
+                # Try to find the matching original document name
+                for temp_path, orig_name in temp_files:
+                    if temp_path in req.source_hint:
+                        source_name = orig_name
+                        break
+                
+                requirement_rows.append({
+                    "Source": source_name,
+                    "Requirement": req.text,
+                })
+                
+        finally:
+            # Clean up temporary files
+            for temp_path, _ in temp_files:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+                    
+    except Exception as e:
+        # Fallback to original regex-only method
+        log(f"Model-based extraction failed: {e}, falling back to regex-only")
+        
+        try:
+            from analysis.utils import split_into_requirements, is_requirement
+        except ImportError as e:
+            st.error(f"Failed to import analysis utilities: {e}")
+            return []
+
+        for doc in docs:
+            doc_requirements = []
+            for req in split_into_requirements(doc["text"]):
+                if is_requirement(req):
+                    requirement_rows.append({
+                        "Source": doc.get("source") or doc.get("name", "unknown"),
+                        "Requirement": req,
+                    })
+                    doc_requirements.append(req)
+
+            if DEBUG:
+                log(f"  Found {len(doc_requirements)} requirements in {doc.get('name', 'unknown')}")
 
     if DEBUG:
         log(f"Total requirement_rows: {len(requirement_rows)}")
@@ -373,6 +442,11 @@ with st.sidebar:
                             # Append to existing documents instead of replacing
                             st.session_state.uploaded_docs.extend(processed_docs)
                             st.session_state.use_uploaded = True
+                            
+                            # Debug: Confirm session state is set
+                            if DEBUG:
+                                print(f"[DEBUG] After processing: use_uploaded = {st.session_state.use_uploaded}")
+                                print(f"[DEBUG] After processing: uploaded_docs count = {len(st.session_state.uploaded_docs)}")
 
                             # Explicitly clear caches to ensure fresh data
                             get_normalized_requirements.clear()
@@ -381,6 +455,18 @@ with st.sidebar:
                             log(f"Successfully processed {len(processed_docs)} documents, total now: {len(st.session_state.uploaded_docs)}")
                             log("Cleared caches for fresh data")
                             st.success(f"Successfully processed {len(processed_docs)} new documents!")
+                            
+                            # Show extraction method status
+                            try:
+                                from analysis.llm_providers import get_default_provider
+                                llm_provider = get_default_provider()
+                                if llm_provider:
+                                    st.info("🤖 Using **LLM-based extraction** with automatic regex fallback")
+                                else:
+                                    st.info("📝 Using **regex-based extraction** (no LLM provider available)")
+                            except Exception:
+                                st.info("📝 Using **regex-based extraction**")
+                            
                             if duplicate_files:
                                 st.info(f"Skipped {len(duplicate_files)} duplicate file(s)")
                             st.rerun()
@@ -551,12 +637,12 @@ with tab_search:
             2. Click "Process Uploaded Files" to extract text
             3. Once processed, you can search, analyze quality, and generate tests
         """)
-        st.stop()
+    # Continue with search functionality even if no docs (will show instructive errors)
 
     llm_options = available_llm_providers()
     if not llm_options:
         st.warning("No LLM providers available. Please check your environment variables and dependencies.")
-        st.stop()
+        # st.stop()  # COMMENTED OUT to allow other tabs to execute
 
     # Lazy imports for QA functionality
     try:
@@ -570,15 +656,49 @@ with tab_search:
             with st.spinner("Indexing uploaded documents…"):
                 docs = load_documents_from_session()
                 if DEBUG:
-                    print(f"Loaded uploaded documents: {len(docs)} documents")
+                    print(f"[DEBUG] get_index_from_uploaded: Loaded {len(docs)} documents")
+                    for i, doc in enumerate(docs):
+                        print(f"  Doc {i+1}: {doc.get('name', 'unknown')} (text_len: {len(doc.get('text', ''))})")
+                
                 if not docs:
+                    if DEBUG:
+                        print("[DEBUG] get_index_from_uploaded: No documents loaded from session")
                     return None
-                embed_model = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-                return build_index(docs, embed_model=embed_model)
+                
+                try:
+                    embed_model = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+                    if DEBUG:
+                        print(f"[DEBUG] get_index_from_uploaded: Using embedding model: {embed_model}")
+                        print(f"[DEBUG] get_index_from_uploaded: About to call build_index with {len(docs)} docs")
+                    
+                    index = build_index(docs, embed_model=embed_model)
+                    
+                    if DEBUG:
+                        print(f"[DEBUG] get_index_from_uploaded: build_index returned: {index is not None}")
+                        print(f"[DEBUG] get_index_from_uploaded: Index type: {type(index)}")
+                    
+                    return index
+                except Exception as e:
+                    error_msg = f"Error building index: {e}"
+                    print(f"[ERROR] get_index_from_uploaded: {error_msg}")  # Always log the actual error
+                    if DEBUG:
+                        import traceback
+                        print(f"[DEBUG] get_index_from_uploaded: Full traceback: {traceback.format_exc()}")
+                    return None
 
         index = get_index_from_uploaded()
         if index is None:
-            st.error("Failed to build the document index. Please check your uploaded documents.")
+            if not st.session_state.uploaded_docs:
+                st.info("ℹ️ Search functionality will be available once you upload and process documents.")
+            else:
+                st.error("Failed to build the document index. This could be due to:")
+                st.markdown("""
+                - Document processing issues
+                - Empty or invalid document content
+                - Missing embedding model dependencies
+                - Memory or resource constraints
+                """)
+                st.info("💡 Try re-uploading your documents or check if they contain readable text content.")
             if DEBUG:
                 print("Failed to build the document index from uploaded documents.")
             st.stop()
@@ -588,7 +708,10 @@ with tab_search:
             if DEBUG:
                 print(f"Retriever created: {retriever}")
         except Exception as e:
-            st.error(f"Failed to create retriever: {e}")
+            if not st.session_state.uploaded_docs:
+                st.info("ℹ️ Document retriever will be ready once you upload and process documents.")
+            else:
+                st.error(f"Failed to create retriever: {e}")
             if DEBUG:
                 print(f"Failed to create retriever: {e}")
             st.stop()
@@ -597,7 +720,10 @@ with tab_search:
         if DEBUG:
             print(f"QA chain created: {qa}")
         if qa is None:
-            st.error("QA chain was not created. Please check your retriever and LLM setup.")
+            if not st.session_state.uploaded_docs:
+                st.info("ℹ️ Question-answering capability will be available once you upload and process documents.")
+            else:
+                st.error("QA chain was not created. Please check your retriever and LLM setup.")
             print("QA chain was not created. Please check your retriever and LLM setup.")
             st.stop()
 
@@ -748,7 +874,7 @@ with tab_search:
 with tab_summaries_traceability:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to view summaries and traceability information.")
-        st.stop()
+        # st.stop()  # COMMENTED OUT to allow other tabs to execute
 
     # Create sub-tabs for Summaries and Traceability
     subtab_summaries, subtab_traceability = st.tabs(["Summaries", "Traceability"])
@@ -821,7 +947,7 @@ with tab_summaries_traceability:
 with tab_quality:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to analyze requirements quality.")
-        st.stop()
+        # st.stop()  # COMMENTED OUT to allow other tabs to execute
 
     # Add anchor for back to top functionality
     st.markdown('<div id="quality-top"></div>', unsafe_allow_html=True)
@@ -1189,7 +1315,7 @@ st.divider()
 with tab_tests:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to generate test scenarios.")
-        st.stop()
+        # st.stop()  # COMMENTED OUT to allow other tabs to execute
 
     try:
         requirement_rows = get_requirement_rows()
@@ -1509,7 +1635,7 @@ with tab_tests:
 with tab_dashboard:
     if not st.session_state.uploaded_docs:
         st.info("Please upload and process documents to view the requirements dashboard.")
-        st.stop()
+        # st.stop()  # COMMENTED OUT to allow other tabs to execute
 
     st.markdown("## Requirements Dashboard")
 
