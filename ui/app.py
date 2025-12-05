@@ -605,9 +605,29 @@ search_quality = unified_search_query
 search_tests = unified_search_query
 search_traceability = unified_search_query
 
-tab_search, tab_summaries_traceability, tab_quality, tab_tests, tab_dashboard = st.tabs(
-    ["Search", "Summaries & Traceability", "Quality", "Test Scenarios", "Dashboard"]
-)
+# Check if documents are loaded to enable/disable tabs
+has_documents = bool(st.session_state.uploaded_docs)
+
+# Add CSS to visually disable tabs when no documents
+if not has_documents:
+    st.markdown("""
+    <style>
+    /* Disable specific tabs when no documents loaded */
+    .stTabs [data-baseweb="tab"]:nth-child(2),
+    .stTabs [data-baseweb="tab"]:nth-child(3), 
+    .stTabs [data-baseweb="tab"]:nth-child(4),
+    .stTabs [data-baseweb="tab"]:nth-child(5) {
+        opacity: 0.4;
+        pointer-events: none;
+        color: #999 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Create tab labels
+tab_labels = ["Search", "Summaries & Traceability", "Quality", "Test Scenarios", "Dashboard"]
+
+tab_search, tab_summaries_traceability, tab_quality, tab_tests, tab_dashboard = st.tabs(tab_labels)
 
 def show_sources(sources):
     unique_sources = []
@@ -912,8 +932,8 @@ with tab_search:
 
 with tab_summaries_traceability:
     if not st.session_state.uploaded_docs:
-        st.info("Please upload and process documents to view summaries and traceability information.")
-        # st.stop()  # COMMENTED OUT to allow other tabs to execute
+        st.empty()  # Show nothing when disabled
+        st.stop()
 
     # Create sub-tabs for Summaries and Traceability
     subtab_summaries, subtab_traceability = st.tabs(["Summaries", "Traceability"])
@@ -985,8 +1005,8 @@ with tab_summaries_traceability:
 
 with tab_quality:
     if not st.session_state.uploaded_docs:
-        st.info("Please upload and process documents to analyze requirements quality.")
-        # st.stop()  # COMMENTED OUT to allow other tabs to execute
+        st.empty()  # Show nothing when disabled
+        st.stop()
 
     # Add anchor for back to top functionality
     st.markdown('<div id="quality-top"></div>', unsafe_allow_html=True)
@@ -1082,7 +1102,10 @@ with tab_quality:
                         else f'<span class="clarity-score-good">{r["ClarityScore"]}</span>'
                     ),
                     "Requirement": r["Requirement"],
-                    "Issues": ", ".join(sorted({i.type for i in r["Issues"]})) or "",
+                    "Issues": ", ".join(sorted({
+                        i.type.replace("PassiveVoice", "Passive voice").replace("NonVerifiable", "Non verifiable") 
+                        for i in r["Issues"]
+                    })) or "",
                     "Source": r["Source"].replace("data/", "") if r["Source"].startswith("data/") else r["Source"],
                 }
                 for r in filtered_sorted
@@ -1114,7 +1137,7 @@ with tab_quality:
                 rewrite_btn_key = f"rewrite_btn_{idx}_{hash(r['Requirement'])}"
                 rewrite_state_key = f"rewrite_state_{idx}_{hash(r['Requirement'])}"
 
-                expander_label = f"📝 {r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''} • Clarity {r['ClarityScore']}"
+                expander_label = f"{r['Requirement']} • Clarity {r['ClarityScore']}"
 
                 # Create a container to prevent layout shifts
                 with st.expander(expander_label, expanded=False):
@@ -1125,12 +1148,22 @@ with tab_quality:
                             unsafe_allow_html=True
                         )
                     else:
-                        main_issues = [i.type for i in r["Issues"]]
-                        st.markdown(f"**🔎 Main issues:** <span class='main-issues'>{', '.join(main_issues)}</span>", unsafe_allow_html=True)
+                        # Get unique issue types and format them properly
+                        raw_issues = [i.type for i in r["Issues"]]
+                        unique_issues = []
+                        seen = set()
+                        for issue in raw_issues:
+                            if issue not in seen:
+                                # Format issue names properly
+                                formatted_issue = issue.replace("PassiveVoice", "Passive voice").replace("NonVerifiable", "Non verifiable")
+                                unique_issues.append(formatted_issue)
+                                seen.add(issue)
+                        
+                        st.markdown(f"**Main issues:** <span class='main-issues'>{', '.join(unique_issues)}</span>", unsafe_allow_html=True)
 
                         # Use native expander for stable collapsible behavior
-                        with st.expander("🔍 Show details", expanded=False):
-                            st.markdown("#### 🗂️ Issue Details")
+                        with st.expander("Show details", expanded=False):
+                            st.markdown("#### Issue Details")
                             for i in r["Issues"]:
                                 st.markdown(
                                     f'- <span class="issue-type">{i.type}</span> — {i.note}<br>&nbsp;&nbsp;&nbsp;&nbsp;_"…{i.span}…"_', unsafe_allow_html=True
@@ -1138,7 +1171,7 @@ with tab_quality:
                             st.markdown("---")
 
                             # Use expander for rewrite suggestions too
-                            with st.expander("✨ Suggest rewrite", expanded=False):
+                            with st.expander("Suggest rewrite", expanded=False):
                                 has_tbd = any(i.type == "TBD" for i in r["Issues"])
                                 if has_tbd:
                                     st.markdown(
@@ -1151,7 +1184,7 @@ with tab_quality:
                                         try:
                                             from analysis.rewrites import suggest_rewrites
                                             rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
-                                            st.markdown("#### 💡 Suggested Improvement")
+                                            st.markdown("#### Suggested Improvement")
                                             st.markdown(f"<div class='rewrite-suggestion'>{rewrite}</div>", unsafe_allow_html=True)
                                         except ImportError as e:
                                             st.error(f"Failed to import rewrite functionality: {e}")
@@ -1360,8 +1393,8 @@ def render_compact_test_card(requirement, clarity_score, status):
 st.divider()
 with tab_tests:
     if not st.session_state.uploaded_docs:
-        st.info("Please upload and process documents to generate test scenarios.")
-        # st.stop()  # COMMENTED OUT to allow other tabs to execute
+        st.empty()  # Show nothing when disabled
+        st.stop()
 
     try:
         requirement_rows = get_requirement_rows()
@@ -1680,8 +1713,8 @@ with tab_tests:
 
 with tab_dashboard:
     if not st.session_state.uploaded_docs:
-        st.info("Please upload and process documents to view the requirements dashboard.")
-        # st.stop()  # COMMENTED OUT to allow other tabs to execute
+        st.empty()  # Show nothing when disabled
+        st.stop()
 
     st.markdown("## Requirements Dashboard")
 
