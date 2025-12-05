@@ -152,7 +152,7 @@ def load_documents_from_session():
         print(f"  use_uploaded: {getattr(st.session_state, 'use_uploaded', 'NOT_SET')}")
         print(f"  uploaded_docs exists: {hasattr(st.session_state, 'uploaded_docs')}")
         print(f"  uploaded_docs count: {len(getattr(st.session_state, 'uploaded_docs', []))}")
-    
+
     if st.session_state.use_uploaded and st.session_state.uploaded_docs:
         return st.session_state.uploaded_docs
     else:
@@ -196,15 +196,15 @@ def get_requirement_rows():
         from analysis.llm_providers import get_default_provider
         import tempfile
         import os
-        
+
         # Check if LLM is available
         llm_provider = get_default_provider()
         use_llm = llm_provider is not None
-        
+
         if DEBUG:
             method = "LLM with regex fallback" if use_llm else "regex/heuristics only"
             log(f"Using extraction method: {method}")
-        
+
         # Create temporary files for each document since the extractor expects file paths
         temp_files = []
         try:
@@ -213,40 +213,40 @@ def get_requirement_rows():
                 temp_file.write(doc.get('text', ''))
                 temp_file.close()
                 temp_files.append((temp_file.name, doc.get('name', 'unknown')))
-            
+
             # Extract requirements using model-based approach, processing one document at a time
             # to maintain proper source mapping
             all_extracted_requirements = []
             for temp_path, orig_name in temp_files:
                 file_requirements = extract_requirements_with_model([temp_path], use_llm=use_llm)
-                
+
                 # Update the source_hint to be the original document name for all requirements from this file
                 for req in file_requirements:
                     req.source_hint = orig_name
                     all_extracted_requirements.append(req)
-            
+
             if DEBUG:
                 log(f"Model-based extraction found {len(all_extracted_requirements)} requirements")
                 for i, req in enumerate(all_extracted_requirements):
                     log(f"  Req {i+1}: ID='{req.id}', source='{req.source_hint}', text_preview='{req.text[:50]}...'")
-            
+
             # Convert to the expected format
             for req in all_extracted_requirements:
                 # Use the source_hint which now contains the original document name
                 source_name = req.source_hint
-                
+
                 # Include requirement ID in the text if available
                 requirement_text = req.text
                 if req.id and req.id.strip():
                     # Check if ID is already in the text
                     if req.id not in req.text:
                         requirement_text = f"{req.id}: {req.text}"
-                
+
                 requirement_rows.append({
                     "Source": source_name,
                     "Requirement": requirement_text,
                 })
-                
+
         finally:
             # Clean up temporary files
             for temp_path, _ in temp_files:
@@ -254,11 +254,11 @@ def get_requirement_rows():
                     os.unlink(temp_path)
                 except OSError:
                     pass
-                    
+
     except Exception as e:
         # Fallback to original regex-only method
         log(f"Model-based extraction failed: {e}, falling back to regex-only")
-        
+
         try:
             from analysis.utils import split_into_requirements, is_requirement
         except ImportError as e:
@@ -451,7 +451,7 @@ with st.sidebar:
                             # Append to existing documents instead of replacing
                             st.session_state.uploaded_docs.extend(processed_docs)
                             st.session_state.use_uploaded = True
-                            
+
                             # Debug: Confirm session state is set
                             if DEBUG:
                                 print(f"[DEBUG] After processing: use_uploaded = {st.session_state.use_uploaded}")
@@ -460,11 +460,18 @@ with st.sidebar:
                             # Explicitly clear caches to ensure fresh data
                             get_normalized_requirements.clear()
                             get_clarity_results.clear()
+                            # Clear any cached indexes in session state
+                            keys_to_remove = [key for key in st.session_state.keys() if key.startswith('index_cache_')]
+                            for key in keys_to_remove:
+                                del st.session_state[key]
+                                if DEBUG:
+                                    print(f"[DEBUG] Cleared index cache: {key}")
+                            # Note: get_index_from_uploaded is cleared within Search tab scope
 
                             log(f"Successfully processed {len(processed_docs)} documents, total now: {len(st.session_state.uploaded_docs)}")
                             log("Cleared caches for fresh data")
                             st.success(f"Successfully processed {len(processed_docs)} new documents!")
-                            
+
                             # Show extraction method status
                             try:
                                 from analysis.llm_providers import get_default_provider
@@ -475,7 +482,7 @@ with st.sidebar:
                                     st.info("📝 Using **regex-based extraction** (no LLM provider available)")
                             except Exception:
                                 st.info("📝 Using **regex-based extraction**")
-                            
+
                             if duplicate_files:
                                 st.info(f"Skipped {len(duplicate_files)} duplicate file(s)")
                             st.rerun()
@@ -660,32 +667,45 @@ with tab_search:
         from analysis.qa import make_qa
 
         # Build index from uploaded documents
-        @st.cache_resource(show_spinner=False)
-        def get_index_from_uploaded():
+        def get_index_from_uploaded(_docs_hash):
+            if DEBUG:
+                print(f"[DEBUG] get_index_from_uploaded: ENTERING function with hash: {_docs_hash}")
+
+            # Check if we have a valid cached index in session state
+            cache_key = f"index_cache_{_docs_hash}"
+            if cache_key in st.session_state:
+                cached_index = st.session_state[cache_key]
+                if DEBUG:
+                    print(f"[DEBUG] get_index_from_uploaded: Found cached index: {cached_index is not None}")
+                return cached_index
+
             with st.spinner("Indexing uploaded documents…"):
                 docs = load_documents_from_session()
                 if DEBUG:
                     print(f"[DEBUG] get_index_from_uploaded: Loaded {len(docs)} documents")
                     for i, doc in enumerate(docs):
                         print(f"  Doc {i+1}: {doc.get('name', 'unknown')} (text_len: {len(doc.get('text', ''))})")
-                
+
                 if not docs:
                     if DEBUG:
                         print("[DEBUG] get_index_from_uploaded: No documents loaded from session")
+                    st.session_state[cache_key] = None
                     return None
-                
+
                 try:
                     embed_model = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
                     if DEBUG:
                         print(f"[DEBUG] get_index_from_uploaded: Using embedding model: {embed_model}")
                         print(f"[DEBUG] get_index_from_uploaded: About to call build_index with {len(docs)} docs")
-                    
+
                     index = build_index(docs, embed_model=embed_model)
-                    
+
                     if DEBUG:
                         print(f"[DEBUG] get_index_from_uploaded: build_index returned: {index is not None}")
                         print(f"[DEBUG] get_index_from_uploaded: Index type: {type(index)}")
-                    
+
+                    # Cache the result in session state
+                    st.session_state[cache_key] = index
                     return index
                 except Exception as e:
                     error_msg = f"Error building index: {e}"
@@ -693,9 +713,19 @@ with tab_search:
                     if DEBUG:
                         import traceback
                         print(f"[DEBUG] get_index_from_uploaded: Full traceback: {traceback.format_exc()}")
+                    st.session_state[cache_key] = None
                     return None
 
-        index = get_index_from_uploaded()
+        # Get current document hash to invalidate cache when docs change
+        docs_hash = get_uploaded_docs_hash()
+        if DEBUG:
+            print(f"[DEBUG] Search tab: About to call get_index_from_uploaded with hash: {docs_hash}")
+
+        index = get_index_from_uploaded(docs_hash)
+        if DEBUG:
+            print(f"[DEBUG] Search tab: get_index_from_uploaded returned: {index is not None}")
+            print(f"[DEBUG] Search tab: Index object type: {type(index) if index else 'None'}")
+
         if index is None:
             if not st.session_state.uploaded_docs:
                 st.info("ℹ️ Search functionality will be available once you upload and process documents.")
@@ -1015,6 +1045,15 @@ with tab_quality:
         )
 
         with subtab_analysis:
+            # Minimal CSS for basic styling
+            st.markdown('''
+                <style>
+                .issue-details {
+                    margin-top: 10px;
+                }
+                </style>
+            ''', unsafe_allow_html=True)
+
             st.caption("Filters")
             colA, colB, colC, colD = st.columns(4)
             f_amb = colA.toggle("Ambiguous", value=True)
@@ -1076,6 +1115,8 @@ with tab_quality:
                 rewrite_state_key = f"rewrite_state_{idx}_{hash(r['Requirement'])}"
 
                 expander_label = f"📝 {r['Requirement'][:100]}{'...' if len(r['Requirement'])>100 else ''} • Clarity {r['ClarityScore']}"
+
+                # Create a container to prevent layout shifts
                 with st.expander(expander_label, expanded=False):
                     # Show status badge and main issues only
                     if r["ClarityScore"] == 100:
@@ -1087,19 +1128,17 @@ with tab_quality:
                         main_issues = [i.type for i in r["Issues"]]
                         st.markdown(f"**🔎 Main issues:** <span class='main-issues'>{', '.join(main_issues)}</span>", unsafe_allow_html=True)
 
-                        # Show details and rewrite only when button is pressed
-                        if st.button("🔍 Show details", key=show_details_key):
-                            st.session_state[details_state_key] = True
-
-                        if st.session_state.get(details_state_key, False):
-                            st.markdown("---")
+                        # Use native expander for stable collapsible behavior
+                        with st.expander("🔍 Show details", expanded=False):
                             st.markdown("#### 🗂️ Issue Details")
                             for i in r["Issues"]:
                                 st.markdown(
                                     f'- <span class="issue-type">{i.type}</span> — {i.note}<br>&nbsp;&nbsp;&nbsp;&nbsp;_"…{i.span}…"_', unsafe_allow_html=True
                                 )
                             st.markdown("---")
-                            if st.button("✨ Suggest rewrite", key=rewrite_btn_key):
+
+                            # Use expander for rewrite suggestions too
+                            with st.expander("✨ Suggest rewrite", expanded=False):
                                 has_tbd = any(i.type == "TBD" for i in r["Issues"])
                                 if has_tbd:
                                     st.markdown(
@@ -1107,17 +1146,15 @@ with tab_quality:
                                         unsafe_allow_html=True
                                     )
                                     st.info("This is not resolvable by AI. You must fill in the blank.")
-                                with st.spinner("Proposing rewrite…"):
-                                    try:
-                                        from analysis.rewrites import suggest_rewrites
-                                        rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
-                                        st.session_state[rewrite_state_key] = rewrite
-                                    except ImportError as e:
-                                        st.error(f"Failed to import rewrite functionality: {e}")
-
-                            if rewrite_state_key in st.session_state:
-                                st.markdown("#### ✏️ <span class='rewrite-header'>Rewrite</span>", unsafe_allow_html=True)
-                                st.info(st.session_state[rewrite_state_key])
+                                else:
+                                    with st.spinner("Proposing rewrite…"):
+                                        try:
+                                            from analysis.rewrites import suggest_rewrites
+                                            rewrite = suggest_rewrites(r["Requirement"], r["Issues"])
+                                            st.markdown("#### 💡 Suggested Improvement")
+                                            st.markdown(f"<div class='rewrite-suggestion'>{rewrite}</div>", unsafe_allow_html=True)
+                                        except ImportError as e:
+                                            st.error(f"Failed to import rewrite functionality: {e}")
 
             # Back to top button
             st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
