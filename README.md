@@ -1,4 +1,4 @@
-# 📘 Req-Analyst-Assistant
+# Req-Analyst-Assistant
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -11,7 +11,7 @@ Helps identify ambiguity, generate test cases, and support traceability
 --- ideal for engineering teams working under standards like
 **DO-178C**, **ISO 26262**, **IEC 61508**, and similar.
 
-## 🧾 Overview
+## Overview
 
 Req-Analyst-Assistant streamlines the review and validation of textual
 requirements.\
@@ -31,27 +31,27 @@ automatically:
 This reduces rework, improves requirement quality, and accelerates
 documentation workflows.
 
-## ✨ Key Features
+## Key Features
 
-### 🔍 Clarity & Ambiguity Detection
+### Clarity & Ambiguity Detection
 
 -   Flags weak terms
 -   Finds missing conditions or unclear actors
 -   Warns about unverifiable statements
 
-### 🧪 Automated Test Case Generation
+### Automated Test Case Generation
 
 Generates structured **Given / When / Then** scenarios.
 
-### 🔗 Traceability Support
+### Traceability Support
 
 Identifies requirement cross-references.
 
-### 🎛️ Simple UI
+### Simple UI
 
 Clean interface built with Streamlit.
 
-## 🏗️ Architecture
+## Architecture
 
     +------------------------+
     |   User Interface (UI)  |
@@ -73,7 +73,7 @@ Clean interface built with Streamlit.
     |  Results Export        |
     +------------------------+
 
-## 📁 Project Structure
+## Project Structure
 
     req-analyst-assistant/
     ├── ingestion/
@@ -83,7 +83,7 @@ Clean interface built with Streamlit.
     ├── requirements.txt
     └── README.md
 
-## 🚀 Installation
+## Installation
 
 ``` bash
 git clone https://github.com/cristinamunteanu/req-analyst-assistant.git
@@ -93,34 +93,34 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## ▶️ Usage
+## Usage
 
 Run the Streamlit app:
 
 ``` bash
-streamlit run streamlit_app.py
+streamlit run ui/app.py
 ```
 
-## 🛠️ Example Output
+## Example Output
 
     Ambiguity: term 'robust' is vague
     Missing detail: encryption method unspecified
     Suggested Test: Given valid data → When encrypting → Then system uses defined algorithm
 
-## 🛣️ Roadmap
+## Roadmap
 
 -   CSV/JSON export\
 -   Requirement clustering\
 -   Local LLM support
 
-## 🤝 Contributing
+## Contributing
 
 Fork → Branch → PR.
 
-## 📜 License
+## License
 
 MIT License.
 
-## 🙌 Acknowledgements
+## Acknowledgements
 
 OpenAI, Streamlit, and the requirements engineering community.
