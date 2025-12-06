@@ -1298,19 +1298,31 @@ button[kind="secondary"] {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
+    padding: 1.25rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(102, 126, 234, 0.15);
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .header-title {
     color: white;
-    margin-bottom: 0.5rem;
-    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+    font-size: 1.6rem;
+    margin-top: 0;
 }
 
 .header-subtitle {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: white !important;
     opacity: 0.9;
     margin-bottom: 0;
+    margin-top: 0;
+    line-height: 1.3;
 }
 
 /* Sidebar header styling */
