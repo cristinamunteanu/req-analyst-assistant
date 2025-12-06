@@ -1,58 +1,126 @@
 # 📘 Req-Analyst-Assistant
 
-An AI-powered assistant for requirements analysis: clarity checks, ambiguity detection, test-case suggestions, and traceability support.  
-This tool helps engineers, analysts, and auditors improve the quality of requirements early in the development lifecycle.
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
+[![Contributions
+Welcome](https://img.shields.io/badge/Contributions-Welcome-orange.svg)]()
 
----
+An AI-powered assistant for analyzing system & software requirements.\
+Helps identify ambiguity, generate test cases, and support traceability
+--- ideal for engineering teams working under standards like
+**DO-178C**, **ISO 26262**, **IEC 61508**, and similar.
 
 ## 🧾 Overview
 
-Req-Analyst-Assistant streamlines the review of system and software requirements.  
-Upload or paste your requirement set, and the assistant will:
+Req-Analyst-Assistant streamlines the review and validation of textual
+requirements.\
+It helps engineers, auditors, and analysts detect issues early by
+applying structured clarity checks and AI-powered insights.
 
-- Detect ambiguous, unclear, or incomplete requirements  
-- Flag vague or risky wording  
-- Suggest test cases (nominal, edge, and failure scenarios)  
-- Highlight missing conditions, missing actors, or circular references  
-- Support traceability between requirements when applicable  
+Upload or paste your requirement set, and the assistant will
+automatically:
 
-This improves requirement quality, reduces rework, and accelerates compliance workflows.
+-   Detect ambiguous, vague, or incomplete requirements\
+-   Highlight unclear actors, weak verbs, untestable statements\
+-   Suggest test cases: nominal, edge, and failure scenarios\
+-   Flag missing preconditions or unclear outputs\
+-   Identify potential circular or missing dependencies\
+-   Provide traceability hints
 
----
+This reduces rework, improves requirement quality, and accelerates
+documentation workflows.
 
-## ✨ Features
+## ✨ Key Features
 
-### 🔍 Clarity & Ambiguity Checks
-- Identifies vague terms, missing actors, unclear conditions, weak verbs, etc.  
-- Flags requirements likely to cause misinterpretation.
+### 🔍 Clarity & Ambiguity Detection
 
-### 🧪 Test Case Suggestion
-- Automatically generates structured test scenarios:
-  - Nominal cases  
-  - Edge cases  
-  - Failure scenarios  
-- Includes Gherkin-style *Given / When / Then* options.
+-   Flags weak terms
+-   Finds missing conditions or unclear actors
+-   Warns about unverifiable statements
 
-### 🧷 Traceability Support
-- Detects requirement cross-references.  
-- Warns about circular dependencies.
+### 🧪 Automated Test Case Generation
 
-### 📄 Multi-Format Ingestion
-- Supports requirements entered as text or uploaded via document ingestion pipelines (depending on implementation).
+Generates structured **Given / When / Then** scenarios.
 
-### 🖥️ Simple, Interactive UI
-- Clean interface for requirement submission and results review.
+### 🔗 Traceability Support
 
----
+Identifies requirement cross-references.
+
+### 🎛️ Simple UI
+
+Clean interface built with Streamlit.
+
+## 🏗️ Architecture
+
+    +------------------------+
+    |   User Interface (UI)  |
+    |   Streamlit App        |
+    +-----------+------------+
+                |
+                v
+    +------------------------+
+    |  Ingestion Layer       |
+    +-----------+------------+
+                |
+                v
+    +------------------------+
+    |  Analysis Engine       |
+    +-----------+------------+
+                |
+                v
+    +------------------------+
+    |  Results Export        |
+    +------------------------+
 
 ## 📁 Project Structure
 
-```text
-req-analyst-assistant/
-│
-├── ingestion/                 # Parsing and loading of requirements
-├── analysis/                  # Ambiguity checks, clarity scoring, test suggestion logic
-├── ui/                        # Application UI (e.g., Streamlit components)
-├── tests/                     # Unit and integration tests
-├── requirements.txt           # Python dependencies
-└── README.md                  # Project documentation
+    req-analyst-assistant/
+    ├── ingestion/
+    ├── analysis/
+    ├── ui/
+    ├── tests/
+    ├── requirements.txt
+    └── README.md
+
+## 🚀 Installation
+
+``` bash
+git clone https://github.com/cristinamunteanu/req-analyst-assistant.git
+cd req-analyst-assistant
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## ▶️ Usage
+
+Run the Streamlit app:
+
+``` bash
+streamlit run streamlit_app.py
+```
+
+## 🛠️ Example Output
+
+    Ambiguity: term 'robust' is vague
+    Missing detail: encryption method unspecified
+    Suggested Test: Given valid data → When encrypting → Then system uses defined algorithm
+
+## 🛣️ Roadmap
+
+-   CSV/JSON export\
+-   Requirement clustering\
+-   Local LLM support
+
+## 🤝 Contributing
+
+Fork → Branch → PR.
+
+## 📜 License
+
+MIT License.
+
+## 🙌 Acknowledgements
+
+OpenAI, Streamlit, and the requirements engineering community.
