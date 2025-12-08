@@ -53,6 +53,8 @@ if "uploaded_docs" not in st.session_state:
     st.session_state.uploaded_docs = []
 if "use_uploaded" not in st.session_state:
     st.session_state.use_uploaded = False
+if "clear_counter" not in st.session_state:
+    st.session_state.clear_counter = 0
 
 def process_uploaded_files(uploaded_files):
     """Process uploaded files and return document list."""
@@ -815,11 +817,13 @@ with tab_search:
     col1, col2 = st.columns([3, 1])
 
     with col1:
+        # Use the clear counter to reset the input when clear is pressed
+        input_key = f"search_tab_query_{st.session_state.clear_counter}"
         query = st.text_input(
             "Your question:",
             placeholder="e.g., What are the performance requirements? Which requirements have dependencies?",
             label_visibility="collapsed",
-            key="search_tab_query"
+            key=input_key
         )
 
     with col2:
@@ -833,11 +837,12 @@ with tab_search:
                 del st.session_state["sources"]
             if "last_query" in st.session_state:
                 del st.session_state["last_query"]
+            # Clear should_update_answer flag to prevent search
+            if "should_update_answer" in st.session_state:
+                del st.session_state["should_update_answer"]
             st.rerun()
 
-    # Get the current query value
-    query = st.session_state.get("search_tab_query", "")
-
+    # Only process query if clear wasn't just pressed
     if query and st.session_state.get("last_query") != query:
         st.session_state["should_update_answer"] = True
         st.session_state["last_query"] = query
