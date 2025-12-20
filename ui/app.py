@@ -286,7 +286,7 @@ def get_requirement_rows():
     return requirement_rows
 
 # --- Cache normalized requirements for reuse across tabs ---
-@st.cache_data(show_spinner=True)
+@st.cache_data(show_spinner=False)
 def get_normalized_requirements(_uploaded_docs_hash):
     requirement_rows = get_requirement_rows()
     requirement_chunks = [
