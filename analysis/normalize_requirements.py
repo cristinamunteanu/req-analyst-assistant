@@ -86,28 +86,48 @@ def parse_normalized_requirement_response(s):
         {'normalized': 'Some random text', 'categories': ['Other']}
     """
     s = s.strip()
-    # Remove markdown code block if present
-    if s.startswith("```json"):
-        s = s[7:]
-    if s.endswith("```"):
-        s = s[:-3]
-    s = s.strip()
+
+    def _strip_json_fence(text: str) -> str:
+        text = text.strip()
+        if text.startswith("```json"):
+            text = text[len("```json"):]
+        elif text.startswith("```"):
+            text = text[len("```"):]
+        if text.endswith("```"):
+            text = text[:-3]
+        return text.strip()
+
+    # 1) Try direct JSON
     try:
         return json.loads(s)
     except Exception:
         pass
-    # Try regex fallback (legacy, for content='```json ... ```')
+
+    # 2) Try to find any ```json ... ``` code block inside the text
+    fenced = re.search(r"```json\s*(\{.*?\})\s*```", s, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        try:
+            return json.loads(fenced.group(1))
+        except Exception:
+            pass
+
+    # 3) Strip fences if the whole response is fenced
+    stripped = _strip_json_fence(s)
+    if stripped != s:
+        try:
+            return json.loads(stripped)
+        except Exception:
+            pass
+
+    # 4) Try regex fallback (legacy, for content='```json ... ```')
     match = re.search(r"content='(```json.*?```)'", s, re.DOTALL)
     if match:
-        content = match.group(1).strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.endswith("```"):
-            content = content[:-3]
+        content = _strip_json_fence(match.group(1))
         try:
             return json.loads(content)
         except Exception:
             pass
+
     return {"normalized": s, "categories": ["Other"]}
 
 
@@ -121,7 +141,11 @@ def normalize_requirements(
     Caches outputs by (embed_model, doc_hash) to avoid redundant LLM calls.
     Returns: List of dicts: [{id, source, text, normalized, categories}]
     """
-    os.makedirs(cache_dir, exist_ok=True)
+    cache_enabled = True
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+    except OSError:
+        cache_enabled = False
 
     llm = make_llm()
     prompt = PromptTemplate(input_variables=["chunk"], template=NORMALIZE_PROMPT)
@@ -134,16 +158,31 @@ def normalize_requirements(
             doc_hash = _hash_doc(text, embed_model)
             cache_path = os.path.join(cache_dir, f"{doc_hash}.pkl")
 
-            if os.path.exists(cache_path):
-                with open(cache_path, "rb") as f:
-                    result = pickle.load(f)
-            else:
+            result = None
+            if cache_enabled:
+                try:
+                    if os.path.exists(cache_path):
+                        with open(cache_path, "rb") as f:
+                            result = pickle.load(f)
+                except OSError:
+                    result = None
+
+            if result is None:
                 chain_input = prompt.format(chunk=text)
                 response = llm.invoke(chain_input, temperature=0)
-                raw_response = response if isinstance(response, str) else getattr(response, "content", str(response)).strip()
+                raw_response = (
+                    response
+                    if isinstance(response, str)
+                    else getattr(response, "content", str(response)).strip()
+                )
                 result = parse_normalized_requirement_response(raw_response)
-                with open(cache_path, "wb") as f:
-                    pickle.dump(result, f)
+
+                if cache_enabled:
+                    try:
+                        with open(cache_path, "wb") as f:
+                            pickle.dump(result, f)
+                    except OSError:
+                        pass
 
             results.append({
                 "id": doc_hash,

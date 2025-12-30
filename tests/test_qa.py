@@ -1,6 +1,8 @@
 import pytest
 import os
 from unittest.mock import Mock, patch, MagicMock
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableLambda
 from analysis.qa import (
     make_llm,
     format_docs,
@@ -59,7 +61,7 @@ class TestMakeLLM:
         mock_chat_openai.assert_called_once_with(model="gpt-4o-mini", temperature=0)
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'huggingface', 'HF_CHAT_MODEL': 'custom/model'})
-    @patch('langchain_huggingface.HuggingFaceHub')
+    @patch('langchain_community.llms.HuggingFaceHub')
     def test_make_llm_huggingface(self, mock_hf_hub):
         """Test HuggingFace LLM creation"""
         mock_llm = Mock()
@@ -74,7 +76,7 @@ class TestMakeLLM:
         )
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'huggingface'}, clear=True)
-    @patch('langchain_huggingface.HuggingFaceHub')
+    @patch('langchain_community.llms.HuggingFaceHub')
     def test_make_llm_huggingface_default_model(self, mock_hf_hub):
         """Test HuggingFace LLM creation with default model"""
         mock_llm = Mock()
@@ -89,7 +91,7 @@ class TestMakeLLM:
         )
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'anthropic', 'ANTHROPIC_MODEL': 'claude-3-opus'})
-    @patch('langchain_anthropic.Anthropic')
+    @patch('langchain_community.llms.Anthropic')
     def test_make_llm_anthropic(self, mock_anthropic):
         """Test Anthropic LLM creation"""
         mock_llm = Mock()
@@ -101,7 +103,7 @@ class TestMakeLLM:
         mock_anthropic.assert_called_once_with(model="claude-3-opus", temperature=0)
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'anthropic'}, clear=True)
-    @patch('langchain_anthropic.Anthropic')
+    @patch('langchain_community.llms.Anthropic')
     def test_make_llm_anthropic_default_model(self, mock_anthropic):
         """Test Anthropic LLM creation with default model"""
         mock_llm = Mock()
@@ -113,7 +115,7 @@ class TestMakeLLM:
         mock_anthropic.assert_called_once_with(model="claude-3-haiku-20240307", temperature=0)
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'ollama', 'OLLAMA_MODEL': 'llama2'})
-    @patch('langchain_ollama.Ollama')
+    @patch('langchain_community.llms.Ollama')
     def test_make_llm_ollama(self, mock_ollama):
         """Test Ollama LLM creation"""
         mock_llm = Mock()
@@ -125,7 +127,7 @@ class TestMakeLLM:
         mock_ollama.assert_called_once_with(model="llama2", temperature=0)
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'ollama'}, clear=True)
-    @patch('langchain_ollama.Ollama')
+    @patch('langchain_community.llms.Ollama')
     def test_make_llm_ollama_default_model(self, mock_ollama):
         """Test Ollama LLM creation with default model"""
         mock_llm = Mock()
@@ -238,129 +240,77 @@ class TestFormatDocs:
 
 class TestQAChain:
     """Test the QAChain class"""
-    
-    def create_mock_retriever(self):
-        """Create a mock retriever that supports LCEL operations"""
-        mock_retriever = Mock()
-        # Mock the pipe operation to return a chainable object
-        mock_pipeline = Mock()
-        mock_retriever.__or__ = Mock(return_value=mock_pipeline)
-        return mock_retriever
-    
-    def create_mock_runnable_chain(self):
-        """Create a mock chain that supports LCEL operations"""
-        mock_chain = Mock()
-        mock_chain.__or__ = Mock(return_value=mock_chain)
-        return mock_chain
-    
-    @patch('langchain_core.runnables.RunnablePassthrough')
-    @patch('langchain_core.output_parsers.StrOutputParser')
-    def test_qa_chain_initialization(self, mock_str_parser, mock_passthrough):
+
+    def create_retriever_runnable(self, docs):
+        return RunnableLambda(lambda _q: docs)
+
+    def create_prompt(self):
+        return PromptTemplate(
+            input_variables=["question", "context"],
+            template=TEMPLATE,
+            partial_variables={"system": SYSTEM},
+        )
+
+    def test_qa_chain_initialization(self):
         """Test QAChain initialization"""
-        mock_retriever = self.create_mock_retriever()
-        mock_llm = Mock()
-        mock_prompt = Mock()
+        docs = [Mock(page_content="Retrieved document content")]
+        retriever = self.create_retriever_runnable(docs)
+        llm = RunnableLambda(lambda _prompt: "Generated answer")
+        prompt = self.create_prompt()
+
+        qa_chain = QAChain(retriever, llm, prompt)
         
-        # Mock the LCEL components
-        mock_passthrough.return_value = Mock()
-        mock_str_parser.return_value = Mock()
-        
-        qa_chain = QAChain(mock_retriever, mock_llm, mock_prompt)
-        
-        assert qa_chain.retriever == mock_retriever
-        assert qa_chain.llm == mock_llm
-        assert qa_chain.prompt == mock_prompt
+        assert qa_chain.retriever == retriever
+        assert qa_chain.llm == llm
+        assert qa_chain.prompt == prompt
         assert qa_chain.rag_chain is not None
     
-    @patch('langchain_core.runnables.RunnablePassthrough')
-    @patch('langchain_core.output_parsers.StrOutputParser')
-    def test_qa_chain_call_with_query(self, mock_str_parser, mock_passthrough):
+    def test_qa_chain_call_with_query(self):
         """Test QAChain call with 'query' key"""
-        mock_retriever = self.create_mock_retriever()
-        mock_llm = Mock()
-        mock_prompt = Mock()
-        
-        # Setup retriever mock
-        mock_doc = Mock()
-        mock_doc.page_content = "Retrieved document content"
-        mock_retriever.invoke.return_value = [mock_doc]
-        
-        # Mock LCEL components
-        mock_passthrough.return_value = Mock()
-        mock_str_parser.return_value = Mock()
-        
-        # Setup the rag_chain mock
-        qa_chain = QAChain(mock_retriever, mock_llm, mock_prompt)
-        qa_chain.rag_chain = Mock()
-        qa_chain.rag_chain.invoke.return_value = "Generated answer"
+        docs = [Mock(page_content="Retrieved document content")]
+        retriever = self.create_retriever_runnable(docs)
+        llm = RunnableLambda(lambda _prompt: "Generated answer")
+        prompt = self.create_prompt()
+        qa_chain = QAChain(retriever, llm, prompt)
         
         inputs = {"query": "What is authentication?"}
         result = qa_chain(inputs)
         
         assert result["result"] == "Generated answer"
-        assert result["source_documents"] == [mock_doc]
-        qa_chain.rag_chain.invoke.assert_called_once_with("What is authentication?")
-        mock_retriever.invoke.assert_called_once_with("What is authentication?")
+        assert result["source_documents"] == docs
     
-    @patch('langchain_core.runnables.RunnablePassthrough')
-    @patch('langchain_core.output_parsers.StrOutputParser')
-    def test_qa_chain_call_with_question(self, mock_str_parser, mock_passthrough):
+    def test_qa_chain_call_with_question(self):
         """Test QAChain call with 'question' key"""
-        mock_retriever = self.create_mock_retriever()
-        mock_llm = Mock()
-        mock_prompt = Mock()
-        
-        mock_doc = Mock()
-        mock_doc.page_content = "Document content"
-        mock_retriever.invoke.return_value = [mock_doc]
-        
-        # Mock LCEL components
-        mock_passthrough.return_value = Mock()
-        mock_str_parser.return_value = Mock()
-        
-        qa_chain = QAChain(mock_retriever, mock_llm, mock_prompt)
-        qa_chain.rag_chain = Mock()
-        qa_chain.rag_chain.invoke.return_value = "Answer"
+        docs = [Mock(page_content="Document content")]
+        retriever = self.create_retriever_runnable(docs)
+        llm = RunnableLambda(lambda _prompt: "Answer")
+        prompt = self.create_prompt()
+        qa_chain = QAChain(retriever, llm, prompt)
         
         inputs = {"question": "How does it work?"}
         result = qa_chain(inputs)
         
         assert result["result"] == "Answer"
-        assert result["source_documents"] == [mock_doc]
-        qa_chain.rag_chain.invoke.assert_called_once_with("How does it work?")
+        assert result["source_documents"] == docs
     
-    @patch('langchain_core.runnables.RunnablePassthrough')
-    @patch('langchain_core.output_parsers.StrOutputParser')
-    def test_qa_chain_call_no_question(self, mock_str_parser, mock_passthrough):
+    def test_qa_chain_call_no_question(self):
         """Test QAChain call without question"""
-        mock_retriever = self.create_mock_retriever()
-        mock_llm = Mock()
-        mock_prompt = Mock()
-        
-        # Mock LCEL components
-        mock_passthrough.return_value = Mock()
-        mock_str_parser.return_value = Mock()
-        
-        qa_chain = QAChain(mock_retriever, mock_llm, mock_prompt)
+        retriever = self.create_retriever_runnable([])
+        llm = RunnableLambda(lambda _prompt: "Answer")
+        prompt = self.create_prompt()
+        qa_chain = QAChain(retriever, llm, prompt)
         
         inputs = {"other_key": "value"}
         
         with pytest.raises(ValueError, match="No question provided in inputs"):
             qa_chain(inputs)
     
-    @patch('langchain_core.runnables.RunnablePassthrough')
-    @patch('langchain_core.output_parsers.StrOutputParser')
-    def test_qa_chain_call_empty_inputs(self, mock_str_parser, mock_passthrough):
+    def test_qa_chain_call_empty_inputs(self):
         """Test QAChain call with empty inputs"""
-        mock_retriever = self.create_mock_retriever()
-        mock_llm = Mock()
-        mock_prompt = Mock()
-        
-        # Mock LCEL components
-        mock_passthrough.return_value = Mock()
-        mock_str_parser.return_value = Mock()
-        
-        qa_chain = QAChain(mock_retriever, mock_llm, mock_prompt)
+        retriever = self.create_retriever_runnable([])
+        llm = RunnableLambda(lambda _prompt: "Answer")
+        prompt = self.create_prompt()
+        qa_chain = QAChain(retriever, llm, prompt)
         
         with pytest.raises(ValueError, match="No question provided in inputs"):
             qa_chain({})
@@ -370,7 +320,7 @@ class TestMakeQA:
     """Test the make_qa factory function"""
     
     @patch('analysis.qa.make_llm')
-    @patch('langchain.prompts.PromptTemplate')
+    @patch('analysis.qa.PromptTemplate')
     @patch('analysis.qa.QAChain')
     def test_make_qa_success(self, mock_qa_chain_class, mock_prompt_template_class, mock_make_llm):
         """Test successful QA chain creation"""
@@ -410,7 +360,7 @@ class TestMakeQA:
             make_qa(mock_retriever)
     
     @patch('analysis.qa.make_llm')
-    @patch('langchain.prompts.PromptTemplate')
+    @patch('analysis.qa.PromptTemplate')
     def test_make_qa_prompt_error(self, mock_prompt_template_class, mock_make_llm):
         """Test make_qa with prompt template error"""
         mock_retriever = Mock()
@@ -423,7 +373,7 @@ class TestMakeQA:
             make_qa(mock_retriever)
     
     @patch('analysis.qa.make_llm')
-    @patch('langchain.prompts.PromptTemplate')
+    @patch('analysis.qa.PromptTemplate')
     @patch('analysis.qa.QAChain')
     def test_make_qa_chain_error(self, mock_qa_chain_class, mock_prompt_template_class, mock_make_llm):
         """Test make_qa with QAChain creation error"""
@@ -450,12 +400,13 @@ class TestIntegration:
         mock_llm = Mock()
         mock_chat_openai.return_value = mock_llm
         
-        mock_retriever = Mock()
+        docs = []
         mock_doc1 = Mock()
         mock_doc1.page_content = "Authentication is the process of verifying user identity."
         mock_doc2 = Mock()
         mock_doc2.page_content = "Multi-factor authentication provides additional security."
-        mock_retriever.invoke.return_value = [mock_doc1, mock_doc2]
+        docs = [mock_doc1, mock_doc2]
+        mock_retriever = RunnableLambda(lambda _q: docs)
         
         # Create QA chain
         qa_chain = make_qa(mock_retriever)
@@ -478,7 +429,6 @@ class TestIntegration:
         
         # Verify the chain was called with the question
         qa_chain.rag_chain.invoke.assert_called_once_with("What is authentication?")
-        mock_retriever.invoke.assert_called_once_with("What is authentication?")
 
 
 class TestEdgeCases:
